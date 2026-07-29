@@ -329,6 +329,7 @@
 			files = (
 			);
 			inputFileListPaths = (
+				"$(SRCROOT)/scripts/ping-island-bridge-inputs.xcfilelist",
 			);
 			inputPaths = (
 			);
@@ -348,6 +349,7 @@
 			files = (
 			);
 			inputFileListPaths = (
+				"$(SRCROOT)/scripts/ping-island-bridge-inputs.xcfilelist",
 			);
 			inputPaths = (
 			);
