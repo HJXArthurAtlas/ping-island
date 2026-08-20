@@ -295,10 +295,13 @@ actor CodexRolloutParser {
         var latestTurnId: String? = seedSnapshot?.latestTurnId
 
         var historyItems: [ChatHistoryItem] = seedSnapshot?.historyItems ?? []
-        var toolIndexes: [String: Int] = Dictionary(uniqueKeysWithValues: historyItems.enumerated().compactMap { index, item in
-            guard case .toolCall = item.type else { return nil }
-            return (item.id, index)
-        })
+        var toolIndexes: [String: Int] = [:]
+        for (index, item) in historyItems.enumerated() {
+            guard case .toolCall = item.type else { continue }
+            // Rollout logs can contain repeated or empty call IDs. Match the streaming
+            // parser's last-write-wins behavior instead of trapping during recovery.
+            toolIndexes[item.id] = index
+        }
         var firstUserMessage: String? = seedSnapshot?.conversationInfo.firstUserMessage
         var lastMessage: String? = seedSnapshot?.conversationInfo.lastMessage
         var lastMessageRole: String? = seedSnapshot?.conversationInfo.lastMessageRole

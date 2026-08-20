@@ -400,6 +400,61 @@ final class CodexRolloutParserTests: XCTestCase {
         XCTAssertEqual(replacementMetrics?.lastReadByteCount, replacementData.count)
     }
 
+    func testUnnamedRolloutIncrementalRecoveryToleratesDuplicateEmptyToolCallIds() async throws {
+        let tempDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+        let threadId = "019fdd31-9f64-7533-8f52-7ac4ed96f003"
+        let rolloutURL = tempDirectory.appendingPathComponent("rollout-\(threadId).jsonl")
+        let initialRollout = """
+        {"timestamp":"2026-08-18T08:00:00Z","type":"session_meta","payload":{"id":"\(threadId)","cwd":"/tmp/unnamed-codex-thread","source":"desktop"}}
+        {"timestamp":"2026-08-18T08:00:01Z","type":"response_item","payload":{"type":"function_call","name":"first_tool","call_id":"","arguments":"{}"}}
+        {"timestamp":"2026-08-18T08:00:02Z","type":"response_item","payload":{"type":"function_call","name":"second_tool","call_id":"","arguments":"{}"}}
+
+        """
+        try initialRollout.write(to: rolloutURL, atomically: true, encoding: .utf8)
+
+        let clientInfo = SessionClientInfo(
+            kind: .codexApp,
+            profileID: "codex-app",
+            name: "Codex App",
+            bundleIdentifier: "com.openai.codex",
+            sessionFilePath: rolloutURL.path
+        )
+
+        let initialSnapshot = await CodexRolloutParser.shared.parseThread(
+            threadId: threadId,
+            fallbackCwd: "/tmp/unnamed-codex-thread",
+            clientInfo: clientInfo
+        )
+        XCTAssertNil(initialSnapshot?.name)
+        XCTAssertEqual(initialSnapshot?.historyItems.count, 2)
+
+        let appendedRollout = """
+        {"timestamp":"2026-08-18T08:00:03Z","type":"event_msg","payload":{"type":"agent_message","phase":"final","message":"Recovered without crashing."}}
+
+        """
+        let appendHandle = try FileHandle(forWritingTo: rolloutURL)
+        try appendHandle.seekToEnd()
+        try appendHandle.write(contentsOf: XCTUnwrap(appendedRollout.data(using: .utf8)))
+        try appendHandle.close()
+
+        let recoveredSnapshot = await CodexRolloutParser.shared.parseThread(
+            threadId: threadId,
+            fallbackCwd: "/tmp/unnamed-codex-thread",
+            clientInfo: clientInfo
+        )
+        let recoveredMetrics = await CodexRolloutParser.shared.debugReadMetrics(forFilePath: rolloutURL.path)
+
+        XCTAssertNil(recoveredSnapshot?.name)
+        XCTAssertEqual(recoveredSnapshot?.historyItems.count, 3)
+        XCTAssertEqual(recoveredSnapshot?.latestResponseText, "Recovered without crashing.")
+        XCTAssertEqual(recoveredMetrics?.fullRebuildCount, 1)
+        XCTAssertEqual(recoveredMetrics?.incrementalReadCount, 1)
+    }
+
     func testRolloutParserBoundsRetainedHistoryWhilePreservingLatestState() async throws {
         let tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
