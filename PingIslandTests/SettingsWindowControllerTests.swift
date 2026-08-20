@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import SwiftUI
 import XCTest
 @testable import Ping_Island
 
@@ -116,6 +117,16 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertFalse(window.isMiniaturized)
 
         controller.dismiss()
+    }
+
+    func testSettingsWindowUsesAppLocaleRootView() throws {
+        let controller = SettingsWindowController.shared
+        let window = try XCTUnwrap(controller.window)
+
+        XCTAssertTrue(
+            window.contentViewController
+                is NSHostingController<AppLocalizedRootView<SettingsWindowView>>
+        )
     }
 
     func testResetToDefaultContentSizeRestoresResizedSettingsWindow() throws {
