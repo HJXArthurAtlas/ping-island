@@ -3431,7 +3431,7 @@ private struct SettingsPanelContentView: View {
                     ),
                     range: Double(BridgeRuntimeConfigSnapshot.minimumDebugLogRetentionDays)...Double(BridgeRuntimeConfigSnapshot.maximumDebugLogRetentionDays),
                     step: 1,
-                    format: { "\(Int($0.rounded())) 天" }
+                    format: { AppLocalization.format("%lld 天", Int64($0.rounded())) }
                 )
                 .disabled(!settings.hookDebugLoggingEnabled)
                 .opacity(settings.hookDebugLoggingEnabled ? 1 : 0.45)
@@ -4583,18 +4583,18 @@ private struct CustomHookInstallSheet: View {
 
     private var installPathPlaceholder: String {
         guard let profile = ClientProfileRegistry.managedHookProfile(id: selectedProfileID) else {
-            return "例如 /path/to/.claude"
+            return AppLocalization.string("例如 /path/to/.claude")
         }
 
         switch profile.installationKind {
         case .jsonHooks, .tomlHooks:
-            return "例如 /path/to/.claude"
+            return AppLocalization.string("例如 /path/to/.claude")
         case .pluginFile:
-            return "例如 /path/to/plugins"
+            return AppLocalization.string("例如 /path/to/plugins")
         case .pluginDirectory:
-            return "例如 /path/to/.hermes 或 /path/to/plugins"
+            return AppLocalization.string("例如 /path/to/.hermes 或 /path/to/plugins")
         case .hookDirectory:
-            return "例如 /path/to/.openclaw 或 /path/to/hooks"
+            return AppLocalization.string("例如 /path/to/.openclaw 或 /path/to/hooks")
         }
     }
 
@@ -6997,7 +6997,7 @@ private struct SoundPreviewButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .help("试听")
+        .help(AppLocalization.string("试听"))
     }
 }
 

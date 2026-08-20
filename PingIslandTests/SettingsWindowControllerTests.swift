@@ -5,6 +5,13 @@ import XCTest
 
 @MainActor
 final class SettingsWindowControllerTests: XCTestCase {
+    func testLocalizationCatalogsContainMatchingKeys() throws {
+        let english = try localizationDictionary(named: "en")
+        let zhHans = try localizationDictionary(named: "zh-Hans")
+
+        XCTAssertEqual(Set(english.keys), Set(zhHans.keys))
+    }
+
     func testFloatingPetGuidanceStringsMentionSecondaryClickToReopenSettings() {
         let zhHans = try! localizationFileContents(named: "zh-Hans")
         XCTAssertTrue(
@@ -182,5 +189,13 @@ final class SettingsWindowControllerTests: XCTestCase {
             .appendingPathComponent("\(localeCode).lproj")
             .appendingPathComponent("Localizable.strings")
         return try String(contentsOf: fileURL, encoding: .utf8)
+    }
+
+    private func localizationDictionary(named localeCode: String) throws -> [String: String] {
+        let contents = try localizationFileContents(named: localeCode)
+        let data = try XCTUnwrap(contents.data(using: .utf8))
+        return try XCTUnwrap(
+            PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String]
+        )
     }
 }
