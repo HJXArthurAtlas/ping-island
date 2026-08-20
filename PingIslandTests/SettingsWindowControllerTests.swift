@@ -12,6 +12,24 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertEqual(Set(english.keys), Set(zhHans.keys))
     }
 
+    func testSettingsOptionsAndMascotCopyHaveEnglishTranslations() throws {
+        let english = try localizationDictionary(named: "en")
+        let keys = SettingsCategory.allCases.flatMap { [$0.title, $0.subtitle] }
+            + UsageValueMode.allCases.map(\.title)
+            + AutoRoutePromptsIdleDelay.allCases.map(\.title)
+            + FloatingPetSizeMode.allCases.flatMap { [$0.title, $0.subtitle] }
+            + SubagentVisibilityMode.allCases.flatMap { [$0.title, $0.subtitle] }
+            + NotchPetStyle.allCases.flatMap { [$0.title, $0.subtitle] }
+            + MascotClient.allCases.flatMap { [$0.title, $0.subtitle] }
+            + MascotKind.allCases.flatMap { [$0.title, $0.subtitle] }
+            + MascotStatus.allCases.map(\.displayName)
+
+        for key in Set(keys).filter(containsHanCharacter) {
+            let translation = try XCTUnwrap(english[key], "Missing English translation for \(key)")
+            XCTAssertNotEqual(translation, key, "Untranslated English value for \(key)")
+        }
+    }
+
     func testFloatingPetGuidanceStringsMentionSecondaryClickToReopenSettings() {
         let zhHans = try! localizationFileContents(named: "zh-Hans")
         XCTAssertTrue(
@@ -197,5 +215,11 @@ final class SettingsWindowControllerTests: XCTestCase {
         return try XCTUnwrap(
             PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String]
         )
+    }
+
+    private func containsHanCharacter(_ value: String) -> Bool {
+        value.unicodeScalars.contains { scalar in
+            (0x4E00...0x9FFF).contains(scalar.value)
+        }
     }
 }
