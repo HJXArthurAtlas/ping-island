@@ -602,6 +602,14 @@
 "去重后的工具调用次数" = "Deduplicated tool calls";
 "按 agent 类型去重后的会话" = "Sessions deduplicated by agent type";
 "Token 费用预估" = "Estimated token spend";
+"会话 Token 统计" = "Session token stats";
+"今日最近 3 个会话" = "Latest 3 sessions today";
+"Tokens 合计" = "tokens total";
+"今天还没有会话记录" = "No sessions recorded today";
+"本周最高消耗会话" = "Highest-usage session this week";
+"本周累计 Tokens" = "Tokens this week";
+"%@ 预估" = "%@ est.";
+"本周还没有会话 Token 记录" = "No session token usage this week";
 "7 天费用" = "7-day spend";
 "30 天费用" = "30-day spend";
 "30 天：%@ Tokens" = "30d: %@ tokens";
