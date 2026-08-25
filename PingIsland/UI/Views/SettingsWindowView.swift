@@ -2459,22 +2459,6 @@ private struct SettingsGlassSurface: NSViewRepresentable {
     }
 }
 
-private struct SettingsWindowDragHandle: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        DragHandleView()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    private final class DragHandleView: NSView {
-        override var mouseDownCanMoveWindow: Bool { false }
-
-        override func mouseDown(with event: NSEvent) {
-            window?.performDrag(with: event)
-        }
-    }
-}
-
 private enum SettingsPanelMetrics {
     static let windowSize = AppSettings.defaultSettingsWindowSize
     static let windowMinSize = AppSettings.minimumSettingsWindowSize
@@ -2490,7 +2474,6 @@ private enum SettingsPanelMetrics {
 private struct SettingsPanelContentView: View {
     let presentation: SettingsPanelPresentation
     var onClose: (() -> Void)? = nil
-    var onMinimize: (() -> Void)? = nil
 
     @StateObject private var viewModel = SettingsPanelViewModel()
     @ObservedObject private var settings = AppSettings.shared
@@ -2536,7 +2519,7 @@ private struct SettingsPanelContentView: View {
         }
         .background(panelBackgroundColor)
         .ignoresSafeArea()
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: panelCornerRadius, style: .continuous))
         .preferredColorScheme(.dark)
         .environment(\.mascotAnimationsEnabled, arePreviewAnimationsActive)
         .onAppear {
@@ -2747,6 +2730,32 @@ private struct SettingsPanelContentView: View {
         .clear
     }
 
+    private var panelCornerRadius: CGFloat {
+        presentation == .window ? 0 : 18
+    }
+
+    private var sidebarShape: UnevenRoundedRectangle {
+        let radius: CGFloat = presentation == .window ? 0 : 24
+        return UnevenRoundedRectangle(
+            topLeadingRadius: radius,
+            bottomLeadingRadius: radius,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: 0,
+            style: .continuous
+        )
+    }
+
+    private var detailShape: UnevenRoundedRectangle {
+        let radius: CGFloat = presentation == .window ? 0 : 26
+        return UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: radius,
+            topTrailingRadius: radius,
+            style: .continuous
+        )
+    }
+
     private var contentTopInset: CGFloat {
         switch presentation {
         case .window:
@@ -2768,10 +2777,6 @@ private struct SettingsPanelContentView: View {
     private var sidebar: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                if presentation == .window {
-                    sidebarWindowControls
-                }
-
                 ForEach(sidebarSections) { section in
                     VStack(alignment: .leading, spacing: 8) {
                         if let title = section.title {
@@ -2801,29 +2806,16 @@ private struct SettingsPanelContentView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 14)
+            .padding(.top, presentation == .window ? 42 : 14)
+            .padding(.bottom, 14)
         }
         .padding(8)
         .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
+            sidebarShape
                 .fill(Color.white.opacity(0.055))
                 .overlay {
                     SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 24,
-                                bottomLeadingRadius: 24,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 0,
-                                style: .continuous
-                            )
-                        )
+                        .clipShape(sidebarShape)
                         .opacity(0.94)
                 }
                 .overlay {
@@ -2836,15 +2828,7 @@ private struct SettingsPanelContentView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 24,
-                            bottomLeadingRadius: 24,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 0,
-                            style: .continuous
-                        )
-                    )
+                    .clipShape(sidebarShape)
                 }
                 .overlay(alignment: .topTrailing) {
                     Circle()
@@ -2854,43 +2838,12 @@ private struct SettingsPanelContentView: View {
                         .offset(x: 28, y: -26)
                 }
         )
-        .overlay(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+        .overlay(sidebarShape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+        .shadow(
+            color: Color.black.opacity(presentation == .window ? 0 : 0.20),
+            radius: 24,
+            y: 14
         )
-        .shadow(color: Color.black.opacity(0.20), radius: 24, y: 14)
-    }
-
-    private var sidebarWindowControls: some View {
-        HStack(spacing: 10) {
-            WindowControlButton(color: Color(red: 1.0, green: 0.37, blue: 0.36)) {
-                if let onClose {
-                    onClose()
-                } else {
-                    currentWindow?.performClose(nil)
-                }
-            }
-
-            WindowControlButton(color: Color(red: 1.0, green: 0.74, blue: 0.18)) {
-                if let onMinimize {
-                    onMinimize()
-                } else {
-                    currentWindow?.miniaturize(nil)
-                }
-            }
-
-            SettingsWindowDragHandle()
-                .frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22)
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 2)
     }
 
     @ViewBuilder
@@ -2925,32 +2878,18 @@ private struct SettingsPanelContentView: View {
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.top, 24)
+            .padding(.top, presentation == .window ? 42 : 24)
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .id(currentCategory)
         .accessibilityIdentifier("settings.detail.\(currentCategory.rawValue)")
         .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 26,
-                topTrailingRadius: 26,
-                style: .continuous
-            )
+            detailShape
                 .fill(Color.white.opacity(0.035))
                 .overlay {
                     SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 0,
-                                bottomLeadingRadius: 0,
-                                bottomTrailingRadius: 26,
-                                topTrailingRadius: 26,
-                                style: .continuous
-                            )
-                        )
+                        .clipShape(detailShape)
                         .opacity(0.96)
                 }
                 .overlay {
@@ -2963,28 +2902,15 @@ private struct SettingsPanelContentView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 0,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 26,
-                            topTrailingRadius: 26,
-                            style: .continuous
-                        )
-                    )
+                    .clipShape(detailShape)
                 }
         )
-        .overlay(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 26,
-                topTrailingRadius: 26,
-                style: .continuous
-            )
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+        .overlay(detailShape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1))
+        .shadow(
+            color: Color.black.opacity(presentation == .window ? 0 : 0.16),
+            radius: 24,
+            y: 14
         )
-        .shadow(color: Color.black.opacity(0.16), radius: 24, y: 14)
     }
 
     private var currentCategory: SettingsCategory {
@@ -4034,14 +3960,12 @@ private struct SettingsPanelContentView: View {
 
 struct SettingsWindowView: View {
     var onClose: (() -> Void)? = nil
-    var onMinimize: (() -> Void)? = nil
 
     var body: some View {
         AppLocalizedRootView {
             SettingsPanelContentView(
                 presentation: .window,
-                onClose: onClose,
-                onMinimize: onMinimize
+                onClose: onClose
             )
             .accessibilityIdentifier("settings.root")
         }
@@ -4133,24 +4057,6 @@ private struct SidebarItemView: View {
         )
         .shadow(color: isSelected ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-private struct WindowControlButton: View {
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(color)
-                .frame(width: 12, height: 12)
-                .overlay(
-                    Circle()
-                        .strokeBorder(Color.black.opacity(0.18), lineWidth: 0.5)
-                )
-        }
-        .buttonStyle(.plain)
     }
 }
 
