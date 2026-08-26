@@ -1,109 +1,138 @@
 # Experience themes
 
-Ping Island ships **compiled-in experience themes**. An experience theme owns
-the presentation decisions that need to stay coherent across a native app:
+Ping Island themes coordinate the parts of an experience that should feel like
+one product—not just a color palette:
 
 ```text
 IslandExperienceTheme
-├── Visual       surfaces, borders, corner geometry, typography, grid treatment
-├── Interaction  approve / scoped-approve / deny / neutral action appearance
+├── Visual       surfaces, borders, typography, icon language and window chrome
+├── Interaction  allow / scoped allow / deny / neutral control appearance
 ├── Motion       press feedback and panel-transition timing
-└── Sound        recommended source and semantic auxiliary-event cues
+└── Sound
+    ├── Lifecycle     processing, attention, completion, error, resource limit
+    └── Auxiliary     launch, new session, approvals, reminders and usage edges
 ```
 
-This is deliberately different from a CESP/OpenPeon sound pack. A sound pack
-is an optional **audio override**; it never changes the selected theme's UI,
-icons, geometry, or motion.
+A CESP/OpenPeon sound pack is different: it is an optional **audio-only
+override**. It never changes the selected theme's UI, icons, geometry or motion.
 
-## For users
+## Built-in experiences
 
 Choose a theme from **Settings → Sound → Experience theme**.
 
-| Theme | Experience |
-| --- | --- |
-| Default | The native macOS-oriented baseline: soft continuous corners, glass-backed settings surfaces, restrained motion, and system-sound recommendations. |
-| Pixel | The reference theme: grid-backed Island and detached surfaces, square controls, pixel action glyphs, higher-contrast semantic controls, and 8-bit sound recommendations. |
+| Theme | Visual language | Recommended audio |
+| --- | --- | --- |
+| **PingIsland native** | Ping Island's dark glass surfaces, rounded controls and existing icon treatment | The original built-in 8-bit mappings, extended to the new semantic moments |
+| **macOS** | Integrated top navigation, native sidebar treatment, SF Symbols, system materials and semantic system colors | macOS system sounds |
+| **Pixel** | Silkscreen type, code-rendered pixel icons, square controls and pixel grid surfaces | AgentIsland's game-style 8-bit mappings |
 
-Selecting a theme applies its recommended sound mode. The five notification
-stages—processing, attention, completion, error, and resource limit—remain
-individually configurable in the Sound settings. A user can also select a local
-CESP/OpenPeon pack afterwards; that replaces audio playback only.
+Pixel is one theme family with two selectable palettes:
+
+- **Arcade Neon** — deep arcade navy with high-contrast cyan accents.
+- **Game Boy Olive** — the classic four-step olive handheld palette.
+
+Both palettes share the same components, motion and sound profile. The palette
+is persisted independently, so adding a third Pixel colorway does not require a
+new top-level theme or a copy of its sound mapping.
+
+Selecting a theme applies its recommended sound source and lifecycle mapping.
+Users can still customize the five lifecycle sounds afterwards, or select a
+local CESP/OpenPeon pack. Changing only the Pixel palette does not reset audio.
+
+## Semantic feedback moments
+
+Product code emits an `AppSoundFeedbackEvent`; it never names an audio file.
+The selected theme resolves that intent to either a system sound, a bundled
+8-bit sound, or a compatible CESP fallback.
+
+The original configurable moments remain:
+
+- processing started;
+- attention required;
+- task completed;
+- task error; and
+- resource limit / compaction.
+
+The architecture also covers launch, Island detachment, new sessions, allow,
+scoped allow, deny, five-minute waiting reminders, crossing 90% usage, usage
+recovery to 20% or less, and three rapid submissions within ten seconds.
+
+Transition detection lives in `ExperienceSoundTransitions.swift`. It is theme
+agnostic: it decides *what happened*, then `AppSoundFeedback` and the active
+profile decide *how it sounds*. Imported CESP v1 packs do not define every new
+category, so each cue documents a compatible lifecycle fallback.
+
+## Action semantics and accessibility
 
 Confirmation actions retain one meaning in every theme:
 
-- Green: allow this operation.
-- Blue: allow within the current scope or session.
-- Red: deny the operation.
-- Gray/white: neutral hand-off actions, such as opening the originating app.
+- Green + checkmark + label: allow this operation.
+- Blue + scoped-check icon + label: allow within the current scope or session.
+- Red + cross + label: deny the operation.
+- Gray/neutral + hand-off icon + label: continue in the originating app.
 
-Buttons also retain text labels, icons, accessibility hints, and reduced-motion
-safe press feedback; color is never the only indication of meaning.
+Color is never the only indication. Controls keep labels, icons, accessibility
+hints, contrast, and reduced-motion-safe press feedback in every theme.
 
-## Architecture
-
-The source is intentionally divided by responsibility:
+## Source layout
 
 ```text
 PingIsland/Core/
-├── ExperienceThemeID.swift        persisted ID and action semantics
-└── AppSoundFeedback.swift         semantic lifecycle/action event entry point
+├── ExperienceThemeID.swift          persisted family and Pixel palette IDs
+├── AppSoundFeedback.swift           semantic feedback entry point
+└── ExperienceSoundTransitions.swift pure timing/threshold evaluators
 
 PingIsland/UI/Themes/
-├── ExperienceTheme.swift          token contract and SwiftUI Environment key
-├── DefaultExperienceTheme.swift   Default implementation
-├── PixelExperienceTheme.swift     Pixel reference implementation
-└── ExperienceThemeRegistry.swift  built-in registration point
+├── ExperienceTheme.swift            full token and sound-profile contract
+├── PingIslandExperienceTheme.swift  original product experience
+├── MacOSExperienceTheme.swift       native system experience
+├── PixelExperienceTheme.swift       Pixel family + both palette definitions
+├── ExperienceThemeSymbols.swift     bundled font + pixel glyph renderer
+└── ExperienceThemeRegistry.swift    single built-in registration point
 
 PingIsland/UI/Components/
-└── ExperienceThemeComponents.swift shared themed confirmation controls/previews
+└── ExperienceThemeComponents.swift  semantic buttons, cards and palette picker
 ```
 
-`AppLocalizedRootView` injects the selected `IslandExperienceTheme` into the
-SwiftUI environment. Any child view reads `@Environment(\.islandExperienceTheme)`
-instead of reaching into settings or defining a local palette. This lets docked
-Island, detached bubbles, settings surfaces, and confirmation controls react to
-one persisted selection.
+`AppLocalizedRootView` resolves the persisted family and Pixel palette, then
+injects one `IslandExperienceTheme` through SwiftUI's environment. Child views
+read `@Environment(\.islandExperienceTheme)` rather than reaching into settings
+or defining a private palette.
 
-Session and UI code emits `AppSoundFeedbackEvent`, not a filename. The five
-configurable lifecycle events still route through `AppSettings.playSound(for:)`.
-For auxiliary events—client start, detached presentation, allow, scoped allow,
-and deny—the active theme supplies a `ExperienceThemeSoundCue`.
+The persisted PingIsland identifier remains `standard`. Do not rename it: the
+raw value is intentionally retained to migrate existing installations safely.
 
-CESP v1 has no dedicated approval or detached-presentation categories. Theme
-sound profiles therefore define a documented fallback to compatible existing
-categories when a CESP pack is active. Keep that compatibility behavior in the
-sound profile, never in an individual SwiftUI view.
+## Adding a first-party theme
 
-## Adding a built-in theme
+Themes are compiled in; third-party UI bundles are not a runtime extension point
+yet. To add a new first-party family:
 
-Themes are code-defined in this release; third-party UI theme bundles are not a
-runtime extension point yet. To add a first-party theme:
+1. Add a stable raw-value case to `ExperienceThemeID`. Never rename an existing
+   persisted value.
+2. Create `<Name>ExperienceTheme.swift` and provide every Visual, Interaction,
+   Motion, lifecycle Sound and auxiliary Sound token.
+3. Register one representative definition in `ExperienceThemeRegistry.all` and
+   resolve variants explicitly in `theme(for:pixelPalette:)` (or a generalized
+   equivalent if the new family has variants).
+4. Use semantic controls and `AppSoundFeedback.play(_:)`. Do not choose action
+   colors or concrete sound files in feature views.
+5. If a new feedback moment is needed, add a semantic event and a pure transition
+   evaluator, then supply a cue in every built-in theme.
+6. Add registry, mapping, persistence and transition assertions to the Xcode
+   test target, and update this user-facing table.
 
-1. Add a stable persisted case to `ExperienceThemeID` and its recommended sound
-   mode. Do not rename an existing raw value.
-2. Create `PingIsland/UI/Themes/<Name>ExperienceTheme.swift` with one complete
-   `IslandExperienceTheme` definition. Supply every Visual, Interaction, Motion,
-   and auxiliary Sound token.
-3. Register the definition in `ExperienceThemeRegistry.all`.
-4. Use semantic components such as `ConfirmationActionButton`; do not add
-   per-screen approval colors or direct bundled sound names.
-5. Add registry and sound-profile assertions to `PingIslandTests/ExperienceThemeTests.swift`.
-6. Update the user-facing theme table in `README.md` and this document.
-
-The `PixelExperienceTheme` is the reference implementation. It demonstrates
-surface treatment, geometry, icon rendering, action roles, motion values, and
-sound cues in a single definition file.
+To add only a Pixel colorway, add a `PixelThemePaletteID` case and its palette
+tokens inside `PixelExperienceTheme`; do not copy the Pixel components or sound
+profile.
 
 ## Verification
 
-`PingIslandTests/ExperienceThemeTests.swift` verifies that:
+The test suite verifies registration uniqueness, all three visual contracts,
+Pixel palette persistence, shared Pixel audio, complete lifecycle/auxiliary cue
+coverage, theme-recommended mappings and transition thresholds. Run both:
 
-- every persisted theme ID is registered exactly once;
-- Default and Pixel keep distinct visual contracts;
-- profile recommendations match persisted selection behavior;
-- every auxiliary event has a cue in every built-in theme; and
-- confirmation roles keep distinct semantic intent.
-
-`AppSettingsPersistenceTests` verifies theme persistence and application of the
-recommended sound mode. Run the app-level test target as well as the Prototype
-suite before release.
+```sh
+xcodebuild -project PingIsland.xcodeproj -scheme PingIsland \
+  -destination 'platform=macOS' test -only-testing:PingIslandTests
+swift test --package-path Prototype
+```

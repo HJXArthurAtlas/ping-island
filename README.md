@@ -143,7 +143,7 @@ Ping Island focuses on the moments that actually interrupt coding flow, then kee
 - **Multi-agent coverage** - Track Claude Code, Codex, Gemini CLI, Antigravity CLI, Hermes Agent, Pi Agent, Qwen Code, Kimi CLI, OpenClaw, OpenCode, Cursor, Qoder, Qoder CN, CodeBuddy, WorkBuddy, GitHub Copilot, and other compatible sessions in one place.
 - **OpenClaw gateway support** - Follow OpenClaw sessions from managed internal hooks, then refill the conversation from OpenClaw's local session transcripts so the Island UI can show the actual back-and-forth instead of a single inbound message.
 - **Codex hook + app-server sync** - Support Codex CLI hooks, live app-server threads, and rollout parsing fallback when needed.
-- **Experience themes** - Choose the native Default or Pixel experience; themes coordinate key surfaces, confirmation feedback, motion, and recommended audio.
+- **Experience themes** - Choose PingIsland native, macOS, or Pixel (with two classic palettes); themes coordinate window chrome, icons, controls, motion, and semantic audio.
 - **Custom sounds** - Pick per-event macOS sounds or import local sound packs without changing the selected visual experience.
 - **Custom agent mascots** - Give each client its own animated mascot override across the notch, session list, and hover UI.
 - **Buddy detach in v0.5.0+** - Drag the active Buddy out of the notch so it can stay nearby as an independent floating companion.
@@ -209,17 +209,23 @@ Ping Island currently ships a 4-category settings panel:
 
 ## Experience Themes
 
-Ping Island includes two built-in experience themes under `Settings -> Sound -> Experience theme`:
+Ping Island includes three built-in experience themes under `Settings -> Sound -> Experience theme`:
 
 | Theme | What it changes | Recommended audio |
 | --- | --- | --- |
-| **Default** | Native macOS-style rounded surfaces, restrained motion, and semantic confirmation controls | System sounds |
-| **Pixel** | Pixel grid surfaces, square control geometry, pixel action glyphs, and 8-bit feedback | Built-in 8-bit sounds |
+| **PingIsland native** | The project's dark glass surfaces, rounded controls, and original visual language | Original built-in 8-bit mapping plus new semantic moments |
+| **macOS** | Integrated top navigation, native sidebar treatment, SF Symbols, system materials, and semantic controls | macOS system sounds |
+| **Pixel** | Silkscreen type, pixel grid surfaces, square controls, and code-rendered pixel icons | AgentIsland game-style 8-bit mapping |
+
+Pixel includes **Arcade Neon** and **Game Boy Olive** palettes. They share one
+component, motion, and sound implementation; changing the palette does not reset
+your sound selection.
 
 Themes are more than a color preset: the same theme supplies visual tokens,
-confirmation-action appearance, motion timing, and auxiliary sound cues. The
-five notification stages remain individually configurable, so you can keep a
-preferred sound for a specific event.
+confirmation-action appearance, motion timing, lifecycle sound mappings, and
+auxiliary cues. In addition to the five configurable notification stages,
+themes cover launch, new sessions, approvals, waiting reminders, rapid submits,
+and usage warning/recovery edges.
 
 Choosing a theme applies its recommended sound mode. You can then switch to a
 local CESP/OpenPeon sound pack; this changes audio only and does not replace the
