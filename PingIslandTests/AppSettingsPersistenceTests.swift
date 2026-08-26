@@ -152,7 +152,39 @@ final class AppSettingsPersistenceTests: XCTestCase {
         let reloadedStore = makeStore(defaults: defaults)
         XCTAssertEqual(reloadedStore.experienceThemeID, .pixel)
         XCTAssertEqual(reloadedStore.soundThemeMode, .island8Bit)
+        XCTAssertEqual(reloadedStore.island8BitTaskCompletedSound, .completeDing)
+        XCTAssertEqual(reloadedStore.island8BitTaskErrorSound, .errorBuzz)
+        XCTAssertEqual(reloadedStore.island8BitResourceLimitSound, .hurt)
         XCTAssertEqual(defaults.string(forKey: "experienceThemeID"), ExperienceThemeID.pixel.rawValue)
+    }
+
+    func testMacOSThemeAppliesSystemSounds() {
+        let defaults = makeDefaults()
+        let store = makeStore(defaults: defaults)
+
+        store.applyExperienceTheme(.macOS)
+
+        XCTAssertEqual(store.experienceThemeID, .macOS)
+        XCTAssertEqual(store.soundThemeMode, .builtIn)
+        XCTAssertEqual(store.processingStartSound, .tink)
+        XCTAssertEqual(store.taskCompletedSound, .blow)
+        XCTAssertEqual(store.taskErrorSound, .basso)
+    }
+
+    func testPixelPalettePersistsIndependentlyFromThemeFamily() {
+        let defaults = makeDefaults()
+        let store = makeStore(defaults: defaults)
+
+        store.pixelThemePaletteID = .gameBoyOlive
+        store.applyExperienceTheme(.pixel)
+
+        let reloadedStore = makeStore(defaults: defaults)
+        XCTAssertEqual(reloadedStore.experienceThemeID, .pixel)
+        XCTAssertEqual(reloadedStore.pixelThemePaletteID, .gameBoyOlive)
+        XCTAssertEqual(
+            defaults.string(forKey: "pixelThemePaletteID"),
+            PixelThemePaletteID.gameBoyOlive.rawValue
+        )
     }
 
     func testSubagentVisibilityModeFallsBackToLegacyCodexKey() {

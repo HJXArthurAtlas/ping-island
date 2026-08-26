@@ -9,19 +9,26 @@ final class ExperienceThemeTests: XCTestCase {
         XCTAssertEqual(registeredIDs.count, Set(registeredIDs).count)
     }
 
-    func testDefaultAndPixelKeepTheirOwnVisualContracts() {
-        let standard = ExperienceThemeRegistry.theme(for: .standard)
-        let pixel = ExperienceThemeRegistry.theme(for: .pixel)
+    func testThreeThemeFamiliesKeepTheirOwnVisualContracts() {
+        let pingIsland = ExperienceThemeRegistry.theme(for: .standard)
+        let macOS = ExperienceThemeRegistry.theme(for: .macOS)
+        let pixel = ExperienceThemeRegistry.theme(for: .pixel, pixelPalette: .arcadeNeon)
 
-        XCTAssertEqual(standard.metadata.displayName, "默认")
-        XCTAssertFalse(standard.visual.usesPixelGrid)
-        XCTAssertTrue(standard.visual.usesGlassMaterial)
-        XCTAssertEqual(standard.visual.controlCornerRadius, 18)
+        XCTAssertEqual(pingIsland.metadata.displayName, "PingIsland 原生")
+        XCTAssertEqual(pingIsland.sound.recommendedMode, .island8Bit)
+        XCTAssertEqual(pingIsland.visual.settingsChromeStyle, .pingIsland)
+
+        XCTAssertEqual(macOS.metadata.displayName, "macOS")
+        XCTAssertEqual(macOS.sound.recommendedMode, .builtIn)
+        XCTAssertEqual(macOS.visual.settingsChromeStyle, .macOS)
+        XCTAssertNil(macOS.pixelPaletteID)
 
         XCTAssertEqual(pixel.metadata.displayName, "Pixel")
         XCTAssertTrue(pixel.visual.usesPixelGrid)
         XCTAssertFalse(pixel.visual.usesGlassMaterial)
         XCTAssertEqual(pixel.visual.controlCornerRadius, 2)
+        XCTAssertEqual(pixel.pixelPaletteID, .arcadeNeon)
+        XCTAssertEqual(pixel.visual.customFontName, "Silkscreen-Bold")
     }
 
     func testThemeSoundProfilesMatchTheirRecommendedModes() {
@@ -34,6 +41,21 @@ final class ExperienceThemeTests: XCTestCase {
             ExperienceThemeRegistry.theme(for: .pixel).sound.cue(for: .clientStarted)?.island8BitSound,
             .bootJingle
         )
+    }
+
+    func testPixelPalettesShareTheAgentIslandSoundProfile() {
+        let arcade = ExperienceThemeRegistry.theme(for: .pixel, pixelPalette: .arcadeNeon)
+        let gameBoy = ExperienceThemeRegistry.theme(for: .pixel, pixelPalette: .gameBoyOlive)
+
+        XCTAssertNotEqual(
+            String(describing: arcade.visual.accent),
+            String(describing: gameBoy.visual.accent)
+        )
+        XCTAssertEqual(arcade.sound.cue(for: .taskCompleted), gameBoy.sound.cue(for: .taskCompleted))
+        XCTAssertEqual(arcade.sound.cue(for: .taskError), gameBoy.sound.cue(for: .taskError))
+        XCTAssertEqual(arcade.sound.cue(for: .taskCompleted)?.island8BitSound, .completeDing)
+        XCTAssertEqual(arcade.sound.cue(for: .taskError)?.island8BitSound, .errorBuzz)
+        XCTAssertEqual(arcade.sound.cue(for: .resourceLimit)?.island8BitSound, .hurt)
     }
 
     func testConfirmationActionRolesKeepTheirSemanticsDistinct() {
@@ -55,6 +77,17 @@ final class ExperienceThemeTests: XCTestCase {
                 XCTAssertNotNil(
                     theme.sound.cue(for: event),
                     "\(theme.id.rawValue) must define a cue for \(event.id)"
+                )
+            }
+        }
+    }
+
+    func testEveryThemeSuppliesCuesForConfigurableLifecycleFeedback() {
+        for theme in ExperienceThemeRegistry.all {
+            for event in NotificationEvent.allCases {
+                XCTAssertNotNil(
+                    theme.sound.cue(for: event),
+                    "\(theme.id.rawValue) must define a lifecycle cue for \(event.rawValue)"
                 )
             }
         }

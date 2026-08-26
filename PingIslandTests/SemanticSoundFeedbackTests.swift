@@ -17,5 +17,10 @@ final class SemanticSoundFeedbackTests: XCTestCase {
         XCTAssertEqual(AppSoundFeedbackEvent.approvalRejected.soundPackFallbackEvent, .taskError)
         XCTAssertEqual(AppSoundFeedbackEvent.clientStarted.island8BitSound, .powerUp)
         XCTAssertEqual(AppSoundFeedbackEvent.islandDetached.island8BitSound, .bubblePop)
+        XCTAssertEqual(AppSoundFeedbackEvent.sessionStarted.soundPackFallbackEvent, .processingStarted)
+        XCTAssertEqual(AppSoundFeedbackEvent.idleReminder.soundPackFallbackEvent, .attentionRequired)
+        XCTAssertEqual(AppSoundFeedbackEvent.usageWarning.soundPackFallbackEvent, .taskError)
+        XCTAssertEqual(AppSoundFeedbackEvent.usageReset.soundPackFallbackEvent, .taskCompleted)
+        XCTAssertEqual(AppSoundFeedbackEvent.rapidSubmit.soundPackFallbackEvent, .processingStarted)
     }
 }
