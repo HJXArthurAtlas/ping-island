@@ -141,6 +141,20 @@ final class AppSettingsPersistenceTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: "codexSubagentVisibilityMode"), SubagentVisibilityMode.visible.rawValue)
     }
 
+    func testExperienceThemePersistsAndAppliesItsRecommendedSoundMode() {
+        let defaults = makeDefaults()
+        let store = makeStore(defaults: defaults)
+
+        XCTAssertEqual(store.experienceThemeID, .standard)
+
+        store.applyExperienceTheme(.pixel)
+
+        let reloadedStore = makeStore(defaults: defaults)
+        XCTAssertEqual(reloadedStore.experienceThemeID, .pixel)
+        XCTAssertEqual(reloadedStore.soundThemeMode, .island8Bit)
+        XCTAssertEqual(defaults.string(forKey: "experienceThemeID"), ExperienceThemeID.pixel.rawValue)
+    }
+
     func testSubagentVisibilityModeFallsBackToLegacyCodexKey() {
         let defaults = makeDefaults()
         defaults.set(SubagentVisibilityMode.hidden.rawValue, forKey: "codexSubagentVisibilityMode")

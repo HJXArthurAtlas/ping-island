@@ -667,6 +667,30 @@ private struct SoundSettingsContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
+            SettingsSectionCard(title: "体验主题") {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("主题同时定义界面细节、确认操作反馈和推荐的提示音方案。导入主题音效包时，视觉主题会保持不变。")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10) {
+                        ForEach(ExperienceThemeID.allCases) { theme in
+                            ExperienceThemeOptionCard(
+                                theme: theme,
+                                isSelected: settings.experienceThemeID == theme
+                            ) {
+                                AppSettings.applyExperienceTheme(theme)
+                            }
+                        }
+                    }
+
+                    Text("选择主题会同步其推荐声音方案；之后仍可在下方改为系统音或 CESP 主题包。")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.secondary.opacity(0.82))
+                }
+            }
+
             SettingsSectionCard(title: "通知") {
                 SettingsToggleLine(
                     title: "启用提示音",

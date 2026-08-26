@@ -420,6 +420,7 @@ final class AppSettingsStore: ObservableObject {
         static let island8BitTaskErrorSound = "island8BitTaskErrorSound"
         static let island8BitResourceLimitSound = "island8BitResourceLimitSound"
         static let soundThemeMode = "soundThemeMode"
+        static let experienceThemeID = "experienceThemeID"
         static let island8BitStartSoundMigrated = "island8BitStartSoundMigrated"
         static let selectedSoundPackPath = "selectedSoundPackPath"
         static let hideInFullscreen = "hideInFullscreen"
@@ -647,6 +648,18 @@ final class AppSettingsStore: ObservableObject {
             defaults.set(soundThemeMode.rawValue, forKey: Keys.soundThemeMode)
             applyIsland8BitStartSoundMigrationIfNeeded(for: soundThemeMode)
         }
+    }
+
+    @Published var experienceThemeID: ExperienceThemeID {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(experienceThemeID.rawValue, forKey: Keys.experienceThemeID)
+        }
+    }
+
+    func applyExperienceTheme(_ theme: ExperienceThemeID) {
+        experienceThemeID = theme
+        soundThemeMode = theme.recommendedSoundThemeMode
     }
 
     @Published var selectedSoundPackPath: String {
@@ -1310,6 +1323,10 @@ final class AppSettingsStore: ObservableObject {
         let resolvedSoundThemeMode = SoundThemeMode(
             rawValue: soundThemeModeRaw ?? ""
         ) ?? .island8Bit
+        let experienceThemeIDRaw = defaults.string(forKey: Keys.experienceThemeID)
+        let resolvedExperienceThemeID = ExperienceThemeID(
+            rawValue: experienceThemeIDRaw ?? ""
+        ) ?? .standard
         let subagentVisibilityModeRaw = defaults.string(forKey: Keys.subagentVisibilityMode)
             ?? defaults.string(forKey: Keys.legacyCodexSubagentVisibilityMode)
         let temporarilyMuteNotificationsUntilTimestamp = persistedKeys.contains(Keys.temporarilyMuteNotificationsUntil)
@@ -1419,6 +1436,7 @@ final class AppSettingsStore: ObservableObject {
             rawValue: defaults.string(forKey: Keys.island8BitResourceLimitSound) ?? ""
         ) ?? .completeDing)
         _soundThemeMode = Published(initialValue: resolvedSoundThemeMode)
+        _experienceThemeID = Published(initialValue: resolvedExperienceThemeID)
         _selectedSoundPackPath = Published(initialValue: defaults.string(forKey: Keys.selectedSoundPackPath) ?? "")
         _hideInFullscreen = Published(initialValue: Self.boolValue(
             from: defaults,
@@ -1597,6 +1615,9 @@ final class AppSettingsStore: ObservableObject {
         if defaults.string(forKey: Keys.soundThemeMode) == nil {
             defaults.set(resolvedSoundThemeMode.rawValue, forKey: Keys.soundThemeMode)
         }
+        if defaults.string(forKey: Keys.experienceThemeID) == nil {
+            defaults.set(resolvedExperienceThemeID.rawValue, forKey: Keys.experienceThemeID)
+        }
         if activeTemporaryMute == nil {
             defaults.removeObject(forKey: Keys.temporarilyMuteNotificationsUntil)
         }
@@ -1672,6 +1693,15 @@ enum AppSettings {
     static var soundThemeMode: SoundThemeMode {
         get { shared.soundThemeMode }
         set { shared.soundThemeMode = newValue }
+    }
+
+    static var experienceThemeID: ExperienceThemeID {
+        get { shared.experienceThemeID }
+        set { shared.experienceThemeID = newValue }
+    }
+
+    static func applyExperienceTheme(_ theme: ExperienceThemeID) {
+        shared.applyExperienceTheme(theme)
     }
 
     static var selectedSoundPackPath: String {
