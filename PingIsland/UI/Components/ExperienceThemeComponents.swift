@@ -21,13 +21,7 @@ struct ConfirmationActionButton: View {
                 ConfirmationActionSymbol(role: role, compact: compact)
 
                 Text(title)
-                    .font(
-                        .system(
-                            size: compact ? 10 : 12,
-                            weight: .semibold,
-                            design: theme.visual.controlFontDesign
-                        )
-                    )
+                    .font(theme.visual.font(size: compact ? 10 : 12, weight: .semibold))
             }
             .lineLimit(1)
             .padding(.horizontal, compact ? 8 : 12)
@@ -62,19 +56,20 @@ struct ConfirmationActionButton: View {
 
 struct ExperienceThemeOptionCard: View {
     let themeID: ExperienceThemeID
+    var pixelPaletteID: PixelThemePaletteID = .arcadeNeon
     let isSelected: Bool
     let action: () -> Void
 
     private var theme: IslandExperienceTheme {
-        ExperienceThemeRegistry.theme(for: themeID)
+        ExperienceThemeRegistry.theme(for: themeID, pixelPalette: pixelPaletteID)
     }
 
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(theme.metadata.displayName)
-                        .font(.system(size: 14, weight: .semibold, design: theme.visual.controlFontDesign))
+                    Text(appLocalized: theme.metadata.displayName)
+                        .font(theme.visual.font(size: 14, weight: .semibold))
 
                     Spacer(minLength: 0)
 
@@ -85,7 +80,7 @@ struct ExperienceThemeOptionCard: View {
                 ExperienceThemePreview(theme: theme)
                     .environment(\.islandExperienceTheme, theme)
 
-                Text(theme.metadata.description)
+                Text(appLocalized: theme.metadata.description)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(theme.visual.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -101,6 +96,63 @@ struct ExperienceThemeOptionCard: View {
         )
         .accessibilityLabel("\(theme.metadata.displayName) 体验主题")
         .accessibilityValue(isSelected ? "已选择" : "未选择")
+    }
+}
+
+struct PixelThemePalettePicker: View {
+    @Binding var selection: PixelThemePaletteID
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(PixelThemePaletteID.allCases) { paletteID in
+                let theme = ExperienceThemeRegistry.theme(for: .pixel, pixelPalette: paletteID)
+                Button {
+                    selection = paletteID
+                } label: {
+                    HStack(spacing: 9) {
+                        HStack(spacing: 2) {
+                            theme.visual.settingsSidebarSurface
+                            theme.visual.settingsCardSurface
+                            theme.visual.accent
+                            theme.visual.primaryText
+                        }
+                        .frame(width: 46, height: 18)
+                        .clipShape(RoundedRectangle(cornerRadius: 2))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 2)
+                                .strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(appLocalized: paletteID.displayName)
+                                .font(theme.visual.font(size: 11, weight: .bold))
+                            Text(appLocalized: paletteID.description)
+                                .font(.system(size: 10, weight: .medium))
+                                .lineLimit(1)
+                        }
+
+                        Spacer(minLength: 0)
+
+                        Image(systemName: selection == paletteID ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(selection == paletteID ? theme.visual.accent : .secondary)
+                    }
+                    .foregroundStyle(theme.visual.primaryText)
+                    .padding(9)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(theme.visual.previewSurface)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 3)
+                            .strokeBorder(
+                                selection == paletteID ? theme.visual.accent : theme.visual.settingsCardBorder,
+                                lineWidth: selection == paletteID ? 1.5 : 1
+                            )
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(paletteID.displayName) Pixel 配色")
+                .accessibilityValue(selection == paletteID ? "已选择" : "未选择")
+            }
+        }
     }
 }
 

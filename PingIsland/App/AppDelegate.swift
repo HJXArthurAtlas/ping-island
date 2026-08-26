@@ -12,6 +12,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var shouldRunHookWalkthroughAfterOnboarding = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ExperienceThemeFontRegistry.registerBundledFonts()
+
         if launchConfiguration.shouldEnforceSingleInstance && !ensureSingleInstance() {
             NSApplication.shared.terminate(nil)
             return

@@ -678,11 +678,22 @@ private struct SoundSettingsContent: View {
                         ForEach(ExperienceThemeID.allCases) { theme in
                             ExperienceThemeOptionCard(
                                 themeID: theme,
+                                pixelPaletteID: settings.pixelThemePaletteID,
                                 isSelected: settings.experienceThemeID == theme
                             ) {
                                 AppSettings.applyExperienceTheme(theme)
                             }
                         }
+                    }
+
+                    if settings.experienceThemeID == .pixel {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Pixel 配色")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                            PixelThemePalettePicker(selection: $settings.pixelThemePaletteID)
+                        }
+                        .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
                     Text("选择主题会同步其推荐声音方案；之后仍可在下方改为系统音或 CESP 主题包。")
@@ -2544,13 +2555,20 @@ private struct SettingsPanelContentView: View {
 
     var body: some View {
         ZStack {
-            HStack(spacing: 0) {
-                sidebar
-                    .frame(width: sidebarWidth)
-                    .frame(maxHeight: .infinity, alignment: .top)
+            VStack(spacing: 0) {
+                if presentation == .window,
+                   theme.visual.settingsChromeStyle == .macOS {
+                    macOSWindowToolbar
+                }
 
-                detail
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                HStack(spacing: 0) {
+                    sidebar
+                        .frame(width: sidebarWidth)
+                        .frame(maxHeight: .infinity, alignment: .top)
+
+                    detail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
             }
             .padding(.top, contentTopInset)
             .padding(.horizontal, SettingsPanelMetrics.outerPadding)
@@ -2582,7 +2600,7 @@ private struct SettingsPanelContentView: View {
                 style: theme.visual.settingsCornerRadius <= 4 ? .circular : .continuous
             )
         )
-        .preferredColorScheme(.dark)
+        .preferredColorScheme(theme.visual.preferredColorScheme)
         .environment(\.mascotAnimationsEnabled, arePreviewAnimationsActive)
         .onAppear {
             viewModel.refreshInitialState()
@@ -2809,7 +2827,8 @@ private struct SettingsPanelContentView: View {
     private var sidebar: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                if presentation == .window {
+                if presentation == .window,
+                   theme.visual.settingsChromeStyle != .macOS {
                     sidebarWindowControls
                 }
 
@@ -2910,7 +2929,10 @@ private struct SettingsPanelContentView: View {
 
     private var sidebarWindowControls: some View {
         HStack(spacing: 10) {
-            WindowControlButton(color: Color(red: 1.0, green: 0.37, blue: 0.36)) {
+            WindowControlButton(
+                color: Color(red: 1.0, green: 0.37, blue: 0.36),
+                symbol: "xmark"
+            ) {
                 if let onClose {
                     onClose()
                 } else {
@@ -2918,12 +2940,22 @@ private struct SettingsPanelContentView: View {
                 }
             }
 
-            WindowControlButton(color: Color(red: 1.0, green: 0.74, blue: 0.18)) {
+            WindowControlButton(
+                color: Color(red: 1.0, green: 0.74, blue: 0.18),
+                symbol: "minus"
+            ) {
                 if let onMinimize {
                     onMinimize()
                 } else {
                     currentWindow?.miniaturize(nil)
                 }
+            }
+
+            WindowControlButton(
+                color: Color(red: 0.16, green: 0.78, blue: 0.29),
+                symbol: "arrow.up.left.and.arrow.down.right"
+            ) {
+                currentWindow?.toggleFullScreen(nil)
             }
 
             SettingsWindowDragHandle()
@@ -2932,6 +2964,65 @@ private struct SettingsPanelContentView: View {
         }
         .padding(.horizontal, 8)
         .padding(.bottom, 2)
+    }
+
+    private var macOSWindowToolbar: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 9) {
+                WindowControlButton(
+                    color: Color(red: 1.0, green: 0.37, blue: 0.36),
+                    symbol: "xmark"
+                ) {
+                    if let onClose { onClose() } else { currentWindow?.performClose(nil) }
+                }
+                WindowControlButton(
+                    color: Color(red: 1.0, green: 0.74, blue: 0.18),
+                    symbol: "minus"
+                ) {
+                    if let onMinimize { onMinimize() } else { currentWindow?.miniaturize(nil) }
+                }
+                WindowControlButton(
+                    color: Color(red: 0.16, green: 0.78, blue: 0.29),
+                    symbol: "arrow.up.left.and.arrow.down.right"
+                ) {
+                    currentWindow?.toggleFullScreen(nil)
+                }
+
+                SettingsWindowDragHandle()
+                    .frame(maxWidth: .infinity, minHeight: 28, maxHeight: 28)
+                    .accessibilityHidden(true)
+            }
+            .padding(.leading, 20)
+            .padding(.trailing, 12)
+            .frame(width: sidebarWidth)
+
+            Divider()
+
+            HStack(spacing: 8) {
+                Image(systemName: currentCategory.icon)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.visual.secondaryText)
+                Text(appLocalized: currentCategory.title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.visual.primaryText)
+
+                SettingsWindowDragHandle()
+                    .frame(maxWidth: .infinity, minHeight: 28, maxHeight: 28)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 16)
+        }
+        .frame(height: 52)
+        .background {
+            SettingsGlassSurface(material: .headerView, blendingMode: .withinWindow)
+                .opacity(theme.visual.usesGlassMaterial ? 1 : 0)
+            theme.visual.settingsSurface.opacity(0.90)
+        }
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(theme.visual.settingsCardBorder)
+                .frame(height: 1)
+        }
     }
 
     @ViewBuilder
@@ -4102,37 +4193,24 @@ private struct SidebarItemView: View {
     let category: SettingsCategory
     let isSelected: Bool
     var showsNoticeDot: Bool = false
+    @Environment(\.islandExperienceTheme) private var theme
 
     var body: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: category.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(isSelected ? 0.95 : 1))
+                ExperienceThemeSidebarSymbol(
+                    category: category,
+                    color: symbolColor
+                )
                     .frame(width: 24, height: 24)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(
-                                isSelected
-                                ? LinearGradient(
-                                    colors: [
-                                        category.tint.opacity(0.95),
-                                        category.tint.opacity(0.60)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                                : LinearGradient(
-                                    colors: [
-                                        category.tint.opacity(0.92),
-                                        category.tint.opacity(0.74)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
+                            .fill(symbolBackground)
                     )
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .clipShape(RoundedRectangle(
+                        cornerRadius: theme.visual.usesPixelGrid ? 1 : 8,
+                        style: theme.visual.usesPixelGrid ? .circular : .continuous
+                    ))
 
                 if showsNoticeDot {
                     Circle()
@@ -4149,13 +4227,13 @@ private struct SidebarItemView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(appLocalized: category.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(.white.opacity(isSelected ? 0.94 : 0.80))
+                    .font(theme.visual.font(size: 13, weight: .semibold))
+                    .foregroundColor(theme.visual.primaryText.opacity(isSelected ? 0.96 : 0.80))
                     .lineLimit(1)
 
                 Text(appLocalized: category.subtitle)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(isSelected ? 0.60 : 0.42))
+                    .foregroundColor(theme.visual.secondaryText.opacity(isSelected ? 0.82 : 0.62))
                     .lineLimit(1)
             }
 
@@ -4166,20 +4244,55 @@ private struct SidebarItemView: View {
         .padding(.vertical, 9)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(isSelected ? Color.white.opacity(0.12) : Color.white.opacity(0.02))
+                .fill(rowBackground)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(isSelected ? 0.10 : 0.04), lineWidth: 1)
+                .strokeBorder(theme.visual.settingsCardBorder.opacity(isSelected ? 1 : 0.45), lineWidth: 1)
         )
-        .shadow(color: isSelected ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
+        .shadow(color: isSelected && theme.visual.settingsChromeStyle == .pingIsland ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var symbolColor: Color {
+        switch theme.visual.settingsChromeStyle {
+        case .macOS:
+            return isSelected ? theme.visual.accent : theme.visual.secondaryText
+        case .pixel:
+            return isSelected ? theme.visual.primaryText : theme.visual.accent
+        case .pingIsland:
+            return Color.white.opacity(isSelected ? 0.95 : 1)
+        }
+    }
+
+    private var symbolBackground: Color {
+        switch theme.visual.settingsChromeStyle {
+        case .macOS:
+            return .clear
+        case .pixel:
+            return isSelected ? theme.visual.accent.opacity(0.28) : theme.visual.previewSurface
+        case .pingIsland:
+            return category.tint.opacity(isSelected ? 0.90 : 0.78)
+        }
+    }
+
+    private var rowBackground: Color {
+        switch theme.visual.settingsChromeStyle {
+        case .macOS:
+            return isSelected ? theme.visual.accent.opacity(0.18) : .clear
+        case .pixel:
+            return isSelected ? theme.visual.accent.opacity(0.20) : .clear
+        case .pingIsland:
+            return isSelected ? .white.opacity(0.12) : Color.white.opacity(0.02)
+        }
     }
 }
 
 private struct WindowControlButton: View {
     let color: Color
+    let symbol: String
     let action: () -> Void
+    @State private var isHovering = false
 
     var body: some View {
         Button(action: action) {
@@ -4190,8 +4303,16 @@ private struct WindowControlButton: View {
                     Circle()
                         .strokeBorder(Color.black.opacity(0.18), lineWidth: 0.5)
                 )
+                .overlay {
+                    if isHovering {
+                        Image(systemName: symbol)
+                            .font(.system(size: 6.5, weight: .black))
+                            .foregroundStyle(Color.black.opacity(0.68))
+                    }
+                }
         }
         .buttonStyle(.plain)
+        .onHover { isHovering = $0 }
     }
 }
 
