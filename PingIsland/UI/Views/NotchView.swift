@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Combine
 import CoreGraphics
 import SwiftUI
 
@@ -32,6 +33,7 @@ struct NotchView: View {
     private static let temporaryReminderMuteDuration: TimeInterval = 10 * 60
     private static let startupDetachmentHintDelay: TimeInterval = 1.8
     private static let detachmentHintRetryDelay: TimeInterval = 0.75
+    private static let idleReminderTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     @ObservedObject var viewModel: NotchViewModel
     @ObservedObject var sessionMonitor: SessionMonitor
@@ -49,11 +51,15 @@ struct NotchView: View {
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
     @State private var hasPrimedSoundTransitions: Bool = false
+    @State private var previousSessionSoundIds: Set<String> = []
     @State private var previousProcessingIds: Set<String> = []
     @State private var previousAttentionSoundIds: Set<String> = []
     @State private var previousCompletionSoundIds: Set<String> = []
     @State private var previousTaskErrorIds: Set<String> = []
     @State private var previousResourceLimitIds: Set<String> = []
+    @State private var rapidSubmitSoundTracker = RapidSubmitSoundTracker()
+    @State private var idleReminderSoundTracker = IdleReminderSoundTracker()
+    @State private var previousUsageSoundPercentage: Double?
     @State private var previousCompletionNotificationPhases: [String: SessionPhase] = [:]
     @State private var completionNotificationQueue: [SessionCompletionNotification] = []
     @State private var activeCompletionNotification: SessionCompletionNotification?
@@ -435,6 +441,15 @@ struct NotchView: View {
                 handleManualAttentionChange(instances)
                 handleCompletedReadyChange(instances)
                 handleCompletionNotificationChange(instances)
+            }
+            .onReceive(Self.idleReminderTimer) { now in
+                handleIdleReminderSound(at: now)
+            }
+            .onReceive(Publishers.CombineLatest(
+                sessionMonitor.$claudeUsageSnapshot,
+                sessionMonitor.$codexUsageSnapshot
+            )) { claude, codex in
+                handleUsageSoundTransition(claude: claude, codex: codex)
             }
     }
 
@@ -1470,6 +1485,7 @@ struct NotchView: View {
 
     private func handleSessionSoundTransitions(_ instances: [SessionState]) {
         if !hasPrimedSoundTransitions {
+            previousSessionSoundIds = Set(instances.map(\.stableId))
             previousProcessingIds = Set(
                 instances
                     .filter(\.phase.contributesToProcessingSoundEdge)
@@ -1507,6 +1523,10 @@ struct NotchView: View {
         let resourceLimitedSessions = instances.filter {
             $0.phase == .compacting
         }
+        let newSessionIds = Set(instances.map(\.stableId))
+        let sessionDeltaIds = newSessionIds.subtracting(previousSessionSoundIds)
+        let newlyStartedSessions = instances.filter { sessionDeltaIds.contains($0.stableId) }
+        let rapidSubmitSessions = rapidSubmitSoundTracker.observe(instances)
 
         let newProcessingIds = Set(processingSessions.map(\.stableId))
         let newAttentionIds = Set(attentionSessions.map(\.stableId))
@@ -1539,10 +1559,15 @@ struct NotchView: View {
             playEventSoundIfNeeded(.attentionRequired, sessions: attentionSessions)
         } else if isNewCompletion {
             playEventSoundIfNeeded(.taskCompleted, sessions: newlyCompletedSessions)
+        } else if !sessionDeltaIds.isEmpty {
+            playEventSoundIfNeeded(.sessionStarted, sessions: newlyStartedSessions)
         } else if !newProcessingIds.subtracting(previousProcessingIds).isEmpty {
             playEventSoundIfNeeded(.processingStarted, sessions: processingSessions)
+        } else if !rapidSubmitSessions.isEmpty {
+            playEventSoundIfNeeded(.rapidSubmit, sessions: rapidSubmitSessions)
         }
 
+        previousSessionSoundIds = newSessionIds
         previousProcessingIds = newProcessingIds
         previousAttentionSoundIds = newAttentionIds
         previousCompletionSoundIds = newCompletedIds
@@ -1550,14 +1575,39 @@ struct NotchView: View {
         previousResourceLimitIds = newResourceLimitIds
     }
 
-    private func playEventSoundIfNeeded(_ event: NotificationEvent, sessions: [SessionState]) {
+    private func handleIdleReminderSound(at now: Date) {
+        let sessions = idleReminderSoundTracker.sessionsNeedingReminder(
+            from: sessionMonitor.instances,
+            now: now
+        )
+        guard !sessions.isEmpty else { return }
+        playEventSoundIfNeeded(.idleReminder, sessions: sessions)
+    }
+
+    private func handleUsageSoundTransition(
+        claude: ClaudeUsageSnapshot?,
+        codex: CodexUsageSnapshot?
+    ) {
+        let current = UsageSoundTransitionEvaluator.maximumUsedPercentage(
+            claude: claude,
+            codex: codex
+        )
+        defer { previousUsageSoundPercentage = current }
+        guard let event = UsageSoundTransitionEvaluator.event(
+            previous: previousUsageSoundPercentage,
+            current: current
+        ) else { return }
+        AppSoundFeedback.play(event)
+    }
+
+    private func playEventSoundIfNeeded(_ event: AppSoundFeedbackEvent, sessions: [SessionState]) {
         guard AppSettings.soundEnabled else { return }
 
         Task {
             let shouldPlaySound = await shouldPlayNotificationSound(for: sessions)
             if shouldPlaySound {
                 _ = await MainActor.run {
-                    AppSoundFeedback.play(event.soundFeedbackEvent)
+                    AppSoundFeedback.play(event)
                 }
             }
         }
