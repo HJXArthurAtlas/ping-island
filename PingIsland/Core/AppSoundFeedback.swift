@@ -5,6 +5,7 @@ import Foundation
 enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
     case clientStarted
     case islandDetached
+    case sessionStarted
     case processingStarted
     case attentionRequired
     case approvalAccepted
@@ -13,6 +14,10 @@ enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
     case taskCompleted
     case taskError
     case resourceLimit
+    case idleReminder
+    case usageWarning
+    case usageReset
+    case rapidSubmit
 
     var id: String { String(describing: self) }
 
@@ -28,7 +33,9 @@ enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
             return .taskError
         case .resourceLimit:
             return .resourceLimit
-        case .clientStarted, .islandDetached, .approvalAccepted, .approvalScoped, .approvalRejected:
+        case .clientStarted, .islandDetached, .sessionStarted,
+             .approvalAccepted, .approvalScoped, .approvalRejected,
+             .idleReminder, .usageWarning, .usageReset, .rapidSubmit:
             return nil
         }
     }
@@ -38,13 +45,13 @@ enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
     /// format gains matching semantic categories.
     var soundPackFallbackEvent: NotificationEvent {
         switch self {
-        case .clientStarted, .islandDetached, .processingStarted:
+        case .clientStarted, .islandDetached, .sessionStarted, .processingStarted, .rapidSubmit:
             return .processingStarted
-        case .attentionRequired, .approvalAccepted, .approvalScoped:
+        case .attentionRequired, .approvalAccepted, .approvalScoped, .idleReminder:
             return .attentionRequired
-        case .approvalRejected, .taskError:
+        case .approvalRejected, .taskError, .usageWarning:
             return .taskError
-        case .taskCompleted:
+        case .taskCompleted, .usageReset:
             return .taskCompleted
         case .resourceLimit:
             return .resourceLimit
@@ -57,6 +64,8 @@ enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
             return .hero
         case .islandDetached:
             return .pop
+        case .sessionStarted:
+            return .hero
         case .processingStarted:
             return .tink
         case .attentionRequired:
@@ -71,6 +80,14 @@ enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
             return .blow
         case .resourceLimit:
             return .morse
+        case .idleReminder:
+            return .purr
+        case .usageWarning:
+            return .submarine
+        case .usageReset:
+            return .glass
+        case .rapidSubmit:
+            return .pop
         }
     }
 
@@ -80,6 +97,8 @@ enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
             return .powerUp
         case .islandDetached:
             return .bubblePop
+        case .sessionStarted:
+            return .startChime
         case .processingStarted:
             return .menuSelect
         case .attentionRequired:
@@ -94,6 +113,14 @@ enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
             return .submitBlip
         case .resourceLimit:
             return .completeDing
+        case .idleReminder:
+            return .menuHighlight
+        case .usageWarning:
+            return .approvalAlert
+        case .usageReset:
+            return .powerUp
+        case .rapidSubmit:
+            return .itemPickup
         }
     }
 }
@@ -126,7 +153,10 @@ enum AppSoundFeedback {
             return
         }
 
-        let theme = ExperienceThemeRegistry.theme(for: AppSettings.experienceThemeID)
+        let theme = ExperienceThemeRegistry.theme(
+            for: AppSettings.experienceThemeID,
+            pixelPalette: AppSettings.pixelThemePaletteID
+        )
         let cue = theme.sound.cue(for: event) ?? ExperienceThemeSoundCue(
             systemSound: event.builtInFallbackSound,
             island8BitSound: event.island8BitSound,

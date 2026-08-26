@@ -5,11 +5,18 @@ import SwiftUI
 /// environment and must use its semantic tokens instead of screen-local colors.
 struct IslandExperienceTheme {
     let id: ExperienceThemeID
+    let pixelPaletteID: PixelThemePaletteID?
     let metadata: ExperienceThemeMetadata
     let visual: ExperienceThemeVisualTokens
     let interaction: ExperienceThemeInteractionTokens
     let motion: ExperienceThemeMotionTokens
     let sound: ExperienceThemeSoundProfile
+}
+
+enum ExperienceThemeSettingsChromeStyle: Equatable {
+    case pingIsland
+    case macOS
+    case pixel
 }
 
 struct ExperienceThemeMetadata {
@@ -36,8 +43,18 @@ struct ExperienceThemeVisualTokens {
     let settingsCornerRadius: CGFloat
     let sectionCornerRadius: CGFloat
     let controlFontDesign: Font.Design
+    let customFontName: String?
+    let preferredColorScheme: ColorScheme?
+    let settingsChromeStyle: ExperienceThemeSettingsChromeStyle
     let usesPixelGrid: Bool
     let usesGlassMaterial: Bool
+
+    func font(size: CGFloat, weight: Font.Weight) -> Font {
+        if let customFontName {
+            return .custom(customFontName, size: size)
+        }
+        return .system(size: size, weight: weight, design: controlFontDesign)
+    }
 }
 
 struct ExperienceThemeMotionTokens {
@@ -81,15 +98,26 @@ struct ExperienceThemeSoundCue: Equatable {
 
 struct ExperienceThemeSoundProfile {
     let recommendedMode: SoundThemeMode
+    let lifecycleCues: [NotificationEvent: ExperienceThemeSoundCue]
     let auxiliaryCues: [AppSoundFeedbackEvent: ExperienceThemeSoundCue]
 
     func cue(for event: AppSoundFeedbackEvent) -> ExperienceThemeSoundCue? {
-        auxiliaryCues[event]
+        if let notificationEvent = event.notificationEvent {
+            return lifecycleCues[notificationEvent]
+        }
+        return auxiliaryCues[event]
+    }
+
+    func cue(for event: NotificationEvent) -> ExperienceThemeSoundCue? {
+        lifecycleCues[event]
     }
 }
 
 private struct IslandExperienceThemeEnvironmentKey: EnvironmentKey {
-    static let defaultValue = ExperienceThemeRegistry.theme(for: .standard)
+    static let defaultValue = ExperienceThemeRegistry.theme(
+        for: .standard,
+        pixelPalette: .arcadeNeon
+    )
 }
 
 extension EnvironmentValues {

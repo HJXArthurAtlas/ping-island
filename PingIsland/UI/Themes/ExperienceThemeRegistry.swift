@@ -5,11 +5,22 @@ import Foundation
 /// file, and register that definition here.
 enum ExperienceThemeRegistry {
     static let all: [IslandExperienceTheme] = [
-        DefaultExperienceTheme.definition,
-        PixelExperienceTheme.definition
+        PingIslandExperienceTheme.definition,
+        MacOSExperienceTheme.definition,
+        PixelExperienceTheme.definition(for: .arcadeNeon)
     ]
 
-    static func theme(for id: ExperienceThemeID) -> IslandExperienceTheme {
-        all.first(where: { $0.id == id }) ?? DefaultExperienceTheme.definition
+    static func theme(
+        for id: ExperienceThemeID,
+        pixelPalette: PixelThemePaletteID = .arcadeNeon
+    ) -> IslandExperienceTheme {
+        switch id {
+        case .standard:
+            return PingIslandExperienceTheme.definition
+        case .macOS:
+            return MacOSExperienceTheme.definition
+        case .pixel:
+            return PixelExperienceTheme.definition(for: pixelPalette)
+        }
     }
 }

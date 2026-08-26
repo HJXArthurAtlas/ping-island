@@ -1,91 +1,148 @@
 import SwiftUI
 
+/// A single component/sound implementation with two classic visual palettes.
 enum PixelExperienceTheme {
-    static let definition = IslandExperienceTheme(
-        id: .pixel,
-        metadata: ExperienceThemeMetadata(
-            displayName: "Pixel",
-            description: "像素网格、直角控件与 8-bit 提示反馈组成的完整参考实现。",
-            extensionNote: "它展示如何同时替换表面、控件、动效节奏与辅助提示音。"
-        ),
-        visual: ExperienceThemeVisualTokens(
-            islandSurface: Color(red: 0.025, green: 0.06, blue: 0.10),
-            islandTopSeparator: Color(red: 0.22, green: 0.84, blue: 0.88).opacity(0.76),
-            detachedSurface: Color(red: 0.03, green: 0.08, blue: 0.13),
-            settingsSurface: Color(red: 0.025, green: 0.055, blue: 0.095),
-            settingsSidebarSurface: Color(red: 0.04, green: 0.10, blue: 0.15),
-            settingsDetailSurface: Color(red: 0.025, green: 0.07, blue: 0.11),
-            settingsCardSurface: Color(red: 0.055, green: 0.13, blue: 0.18),
-            settingsCardBorder: Color(red: 0.25, green: 0.77, blue: 0.80).opacity(0.42),
-            previewSurface: Color(red: 0.035, green: 0.09, blue: 0.14),
-            previewSidebarSurface: Color(red: 0.08, green: 0.19, blue: 0.24),
-            primaryText: Color(red: 0.90, green: 1.00, blue: 0.97),
-            secondaryText: Color(red: 0.66, green: 0.86, blue: 0.86),
-            accent: Color(red: 0.24, green: 0.86, blue: 0.88),
-            controlCornerRadius: 2,
-            settingsCornerRadius: 4,
-            sectionCornerRadius: 3,
-            controlFontDesign: .monospaced,
-            usesPixelGrid: true,
-            usesGlassMaterial: false
-        ),
-        interaction: ExperienceThemeInteractionTokens(
-            approve: ConfirmationActionAppearance(
-                foreground: Color(red: 0.93, green: 1.00, blue: 0.93),
-                background: Color(red: 0.08, green: 0.42, blue: 0.22),
-                border: Color(red: 0.32, green: 0.98, blue: 0.53)
+    static let allDefinitions = PixelThemePaletteID.allCases.map(definition(for:))
+
+    static func definition(for paletteID: PixelThemePaletteID) -> IslandExperienceTheme {
+        let palette = Palette(id: paletteID)
+        return IslandExperienceTheme(
+            id: .pixel,
+            pixelPaletteID: paletteID,
+            metadata: ExperienceThemeMetadata(
+                displayName: "Pixel",
+                description: "像素字形、游戏机图标和 AgentIsland 8-bit 音效。",
+                extensionNote: "\(paletteID.displayName)：\(paletteID.description)"
             ),
-            scopedApproval: ConfirmationActionAppearance(
-                foreground: Color(red: 0.91, green: 0.97, blue: 1.00),
-                background: Color(red: 0.10, green: 0.28, blue: 0.64),
-                border: Color(red: 0.34, green: 0.70, blue: 1.00)
+            visual: ExperienceThemeVisualTokens(
+                islandSurface: palette.background,
+                islandTopSeparator: palette.accent.opacity(0.82),
+                detachedSurface: palette.background,
+                settingsSurface: palette.background,
+                settingsSidebarSurface: palette.sidebar,
+                settingsDetailSurface: palette.detail,
+                settingsCardSurface: palette.card,
+                settingsCardBorder: palette.border,
+                previewSurface: palette.detail,
+                previewSidebarSurface: palette.sidebar,
+                primaryText: palette.primaryText,
+                secondaryText: palette.secondaryText,
+                accent: palette.accent,
+                controlCornerRadius: 2,
+                settingsCornerRadius: 4,
+                sectionCornerRadius: 3,
+                controlFontDesign: .monospaced,
+                customFontName: "Silkscreen-Bold",
+                preferredColorScheme: .dark,
+                settingsChromeStyle: .pixel,
+                usesPixelGrid: true,
+                usesGlassMaterial: false
             ),
-            deny: ConfirmationActionAppearance(
-                foreground: Color(red: 1.00, green: 0.93, blue: 0.93),
-                background: Color(red: 0.58, green: 0.12, blue: 0.20),
-                border: Color(red: 1.00, green: 0.42, blue: 0.48)
-            ),
-            neutral: ConfirmationActionAppearance(
-                foreground: Color(red: 0.86, green: 0.95, blue: 0.95),
-                background: Color(red: 0.14, green: 0.23, blue: 0.28),
-                border: Color(red: 0.41, green: 0.70, blue: 0.72).opacity(0.72)
-            )
-        ),
-        motion: ExperienceThemeMotionTokens(
-            controlPressScale: 0.97,
-            controlPressDuration: 0.10,
-            panelResponse: 0.32,
-            panelDampingFraction: 0.86
-        ),
-        sound: ExperienceThemeSoundProfile(
-            recommendedMode: .island8Bit,
-            auxiliaryCues: [
-                .clientStarted: ExperienceThemeSoundCue(
-                    systemSound: .hero,
-                    island8BitSound: .bootJingle,
-                    soundPackFallback: .processingStarted
+            interaction: ExperienceThemeInteractionTokens(
+                approve: .init(
+                    foreground: palette.actionForeground,
+                    background: Color(red: 0.08, green: 0.42, blue: 0.22),
+                    border: Color(red: 0.32, green: 0.98, blue: 0.53)
                 ),
-                .islandDetached: ExperienceThemeSoundCue(
-                    systemSound: .pop,
-                    island8BitSound: .bubblePop,
-                    soundPackFallback: .processingStarted
+                scopedApproval: .init(
+                    foreground: palette.actionForeground,
+                    background: Color(red: 0.10, green: 0.28, blue: 0.64),
+                    border: Color(red: 0.34, green: 0.70, blue: 1.00)
                 ),
-                .approvalAccepted: ExperienceThemeSoundCue(
-                    systemSound: .ping,
-                    island8BitSound: .itemPickup,
-                    soundPackFallback: .attentionRequired
+                deny: .init(
+                    foreground: palette.actionForeground,
+                    background: Color(red: 0.58, green: 0.12, blue: 0.20),
+                    border: Color(red: 1.00, green: 0.42, blue: 0.48)
                 ),
-                .approvalScoped: ExperienceThemeSoundCue(
-                    systemSound: .glass,
-                    island8BitSound: .menuSelect,
-                    soundPackFallback: .attentionRequired
-                ),
-                .approvalRejected: ExperienceThemeSoundCue(
-                    systemSound: .basso,
-                    island8BitSound: .hurt,
-                    soundPackFallback: .taskError
+                neutral: .init(
+                    foreground: palette.primaryText,
+                    background: palette.neutralControl,
+                    border: palette.border
                 )
-            ]
+            ),
+            motion: ExperienceThemeMotionTokens(
+                controlPressScale: 0.97,
+                controlPressDuration: 0.10,
+                panelResponse: 0.24,
+                panelDampingFraction: 0.90
+            ),
+            sound: soundProfile
         )
+    }
+
+    /// Exact game-style mappings carried forward from AgentIsland.
+    private static let soundProfile = ExperienceThemeSoundProfile(
+        recommendedMode: .island8Bit,
+        lifecycleCues: [
+            .processingStarted: cue(.tink, .menuSelect, .processingStarted),
+            .attentionRequired: cue(.glass, .approvalAlert, .attentionRequired),
+            .taskCompleted: cue(.blow, .completeDing, .taskCompleted),
+            .taskError: cue(.basso, .errorBuzz, .taskError),
+            .resourceLimit: cue(.morse, .hurt, .resourceLimit)
+        ],
+        auxiliaryCues: [
+            .clientStarted: cue(.hero, .bootJingle, .processingStarted),
+            .islandDetached: cue(.pop, .bubblePop, .processingStarted),
+            .sessionStarted: cue(.hero, .bootJingle, .processingStarted),
+            .approvalAccepted: cue(.ping, .itemPickup, .attentionRequired),
+            .approvalScoped: cue(.glass, .menuSelect, .attentionRequired),
+            .approvalRejected: cue(.basso, .errorBuzz, .taskError),
+            .idleReminder: cue(.purr, .menuHighlight, .attentionRequired),
+            .usageWarning: cue(.submarine, .approvalAlert, .resourceLimit),
+            .usageReset: cue(.glass, .powerUp, .taskCompleted),
+            .rapidSubmit: cue(.pop, .itemPickup, .processingStarted)
+        ]
     )
+
+    private static func cue(
+        _ systemSound: NotificationSound,
+        _ islandSound: Island8BitSound,
+        _ fallback: NotificationEvent
+    ) -> ExperienceThemeSoundCue {
+        ExperienceThemeSoundCue(
+            systemSound: systemSound,
+            island8BitSound: islandSound,
+            soundPackFallback: fallback
+        )
+    }
+
+    private struct Palette {
+        let background: Color
+        let sidebar: Color
+        let detail: Color
+        let card: Color
+        let border: Color
+        let primaryText: Color
+        let secondaryText: Color
+        let accent: Color
+        let neutralControl: Color
+        let actionForeground: Color
+
+        init(id: PixelThemePaletteID) {
+            switch id {
+            case .arcadeNeon:
+                background = Color(red: 0.059, green: 0.090, blue: 0.165)
+                sidebar = Color(red: 0.098, green: 0.129, blue: 0.204)
+                detail = Color(red: 0.073, green: 0.106, blue: 0.180)
+                card = Color(red: 0.098, green: 0.129, blue: 0.204)
+                border = Color(red: 0.145, green: 0.824, blue: 0.871).opacity(0.58)
+                primaryText = Color(red: 0.925, green: 0.973, blue: 1.00)
+                secondaryText = Color(red: 0.580, green: 0.773, blue: 0.843)
+                accent = Color(red: 0.145, green: 0.824, blue: 0.871)
+                neutralControl = Color(red: 0.115, green: 0.157, blue: 0.235)
+                actionForeground = .white
+            case .gameBoyOlive:
+                background = Color(red: 0.059, green: 0.220, blue: 0.059)
+                sidebar = Color(red: 0.188, green: 0.384, blue: 0.188)
+                detail = Color(red: 0.110, green: 0.290, blue: 0.100)
+                card = Color(red: 0.188, green: 0.384, blue: 0.188)
+                border = Color(red: 0.608, green: 0.737, blue: 0.059).opacity(0.82)
+                primaryText = Color(red: 0.608, green: 0.737, blue: 0.059)
+                secondaryText = Color(red: 0.545, green: 0.675, blue: 0.059)
+                accent = Color(red: 0.608, green: 0.737, blue: 0.059)
+                neutralControl = Color(red: 0.118, green: 0.300, blue: 0.100)
+                actionForeground = .white
+            }
+        }
+    }
 }

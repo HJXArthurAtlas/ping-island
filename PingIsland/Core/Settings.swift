@@ -421,6 +421,7 @@ final class AppSettingsStore: ObservableObject {
         static let island8BitResourceLimitSound = "island8BitResourceLimitSound"
         static let soundThemeMode = "soundThemeMode"
         static let experienceThemeID = "experienceThemeID"
+        static let pixelThemePaletteID = "pixelThemePaletteID"
         static let island8BitStartSoundMigrated = "island8BitStartSoundMigrated"
         static let selectedSoundPackPath = "selectedSoundPackPath"
         static let hideInFullscreen = "hideInFullscreen"
@@ -657,9 +658,44 @@ final class AppSettingsStore: ObservableObject {
         }
     }
 
+    @Published var pixelThemePaletteID: PixelThemePaletteID {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(pixelThemePaletteID.rawValue, forKey: Keys.pixelThemePaletteID)
+        }
+    }
+
     func applyExperienceTheme(_ theme: ExperienceThemeID) {
         experienceThemeID = theme
-        soundThemeMode = theme.recommendedSoundThemeMode
+        let soundProfile = ExperienceThemeRegistry.theme(
+            for: theme,
+            pixelPalette: pixelThemePaletteID
+        ).sound
+        applyRecommendedSounds(from: soundProfile)
+        soundThemeMode = soundProfile.recommendedMode
+    }
+
+    private func applyRecommendedSounds(from profile: ExperienceThemeSoundProfile) {
+        for event in NotificationEvent.allCases {
+            guard let cue = profile.cue(for: event) else { continue }
+            switch event {
+            case .processingStarted:
+                processingStartSound = cue.systemSound
+                island8BitProcessingStartSound = cue.island8BitSound
+            case .attentionRequired:
+                attentionRequiredSound = cue.systemSound
+                island8BitAttentionRequiredSound = cue.island8BitSound
+            case .taskCompleted:
+                taskCompletedSound = cue.systemSound
+                island8BitTaskCompletedSound = cue.island8BitSound
+            case .taskError:
+                taskErrorSound = cue.systemSound
+                island8BitTaskErrorSound = cue.island8BitSound
+            case .resourceLimit:
+                resourceLimitSound = cue.systemSound
+                island8BitResourceLimitSound = cue.island8BitSound
+            }
+        }
     }
 
     @Published var selectedSoundPackPath: String {
@@ -1327,6 +1363,10 @@ final class AppSettingsStore: ObservableObject {
         let resolvedExperienceThemeID = ExperienceThemeID(
             rawValue: experienceThemeIDRaw ?? ""
         ) ?? .standard
+        let pixelThemePaletteIDRaw = defaults.string(forKey: Keys.pixelThemePaletteID)
+        let resolvedPixelThemePaletteID = PixelThemePaletteID(
+            rawValue: pixelThemePaletteIDRaw ?? ""
+        ) ?? .arcadeNeon
         let subagentVisibilityModeRaw = defaults.string(forKey: Keys.subagentVisibilityMode)
             ?? defaults.string(forKey: Keys.legacyCodexSubagentVisibilityMode)
         let temporarilyMuteNotificationsUntilTimestamp = persistedKeys.contains(Keys.temporarilyMuteNotificationsUntil)
@@ -1437,6 +1477,7 @@ final class AppSettingsStore: ObservableObject {
         ) ?? .completeDing)
         _soundThemeMode = Published(initialValue: resolvedSoundThemeMode)
         _experienceThemeID = Published(initialValue: resolvedExperienceThemeID)
+        _pixelThemePaletteID = Published(initialValue: resolvedPixelThemePaletteID)
         _selectedSoundPackPath = Published(initialValue: defaults.string(forKey: Keys.selectedSoundPackPath) ?? "")
         _hideInFullscreen = Published(initialValue: Self.boolValue(
             from: defaults,
@@ -1618,6 +1659,9 @@ final class AppSettingsStore: ObservableObject {
         if defaults.string(forKey: Keys.experienceThemeID) == nil {
             defaults.set(resolvedExperienceThemeID.rawValue, forKey: Keys.experienceThemeID)
         }
+        if defaults.string(forKey: Keys.pixelThemePaletteID) == nil {
+            defaults.set(resolvedPixelThemePaletteID.rawValue, forKey: Keys.pixelThemePaletteID)
+        }
         if activeTemporaryMute == nil {
             defaults.removeObject(forKey: Keys.temporarilyMuteNotificationsUntil)
         }
@@ -1698,6 +1742,11 @@ enum AppSettings {
     static var experienceThemeID: ExperienceThemeID {
         get { shared.experienceThemeID }
         set { shared.experienceThemeID = newValue }
+    }
+
+    static var pixelThemePaletteID: PixelThemePaletteID {
+        get { shared.pixelThemePaletteID }
+        set { shared.pixelThemePaletteID = newValue }
     }
 
     static func applyExperienceTheme(_ theme: ExperienceThemeID) {

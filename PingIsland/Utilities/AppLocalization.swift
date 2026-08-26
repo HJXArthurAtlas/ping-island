@@ -42,7 +42,10 @@ struct AppLocalizedRootView<Content: View>: View {
             .environment(\.locale, settings.locale)
             .environment(
                 \.islandExperienceTheme,
-                ExperienceThemeRegistry.theme(for: settings.experienceThemeID)
+                ExperienceThemeRegistry.theme(
+                    for: settings.experienceThemeID,
+                    pixelPalette: settings.pixelThemePaletteID
+                )
             )
     }
 }
