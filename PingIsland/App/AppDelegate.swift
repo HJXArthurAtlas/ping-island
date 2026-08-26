@@ -88,7 +88,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             presentHookInstallOnboardingIfNeeded()
         }
 
-        // Play the fixed client startup sound for the bundled 8-bit theme.
+        // Route launch feedback through the selected experience and sound mode.
         Task { @MainActor in
             AppSettings.playClientStartupSound()
         }

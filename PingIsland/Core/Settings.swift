@@ -1938,8 +1938,7 @@ enum AppSettings {
     }
 
     static func playClientStartupSound() {
-        guard soundEnabled else { return }
-        playBundledSound(named: Island8BitSound.powerUp.rawValue)
+        AppSoundFeedback.play(.clientStarted)
     }
 
     static func playReleaseNotesSuccessSound() {
@@ -1948,8 +1947,22 @@ enum AppSettings {
     }
 
     static func playDetachedCapsuleSound() {
-        guard soundEnabled else { return }
-        playBundledSound(named: "bubbles_pop")
+        AppSoundFeedback.play(.islandDetached)
+    }
+
+    static func playAuxiliarySound(
+        systemSound: NotificationSound,
+        island8BitSound: Island8BitSound,
+        soundPackFallback: NotificationEvent
+    ) {
+        switch soundThemeMode {
+        case .builtIn:
+            playSound(named: systemSound.soundName)
+        case .island8Bit:
+            playBundledSound(named: island8BitSound.rawValue)
+        case .soundPack:
+            playSound(for: soundPackFallback)
+        }
     }
 
     static func playSound(for event: NotificationEvent) {

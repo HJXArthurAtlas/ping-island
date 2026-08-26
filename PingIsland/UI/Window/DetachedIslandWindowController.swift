@@ -2013,7 +2013,7 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
             let shouldPlaySound = await self.shouldPlayNotificationSound(for: sessions)
             if shouldPlaySound {
                 _ = await MainActor.run {
-                    AppSettings.playSound(for: event)
+                    AppSoundFeedback.play(event.soundFeedbackEvent)
                 }
             }
         }
