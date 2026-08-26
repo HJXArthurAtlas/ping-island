@@ -1,52 +1,109 @@
-# Experience themes and semantic feedback
+# Experience themes
 
-Ping Island separates **what happened** from **how it is presented**. Product
-and session code emits `AppSoundFeedbackEvent`; it must not name a bundled wav
-file or choose a visual color directly.
+Ping Island ships **compiled-in experience themes**. An experience theme owns
+the presentation decisions that need to stay coherent across a native app:
 
-## Theme contract
+```text
+IslandExperienceTheme
+├── Visual       surfaces, borders, corner geometry, typography, grid treatment
+├── Interaction  approve / scoped-approve / deny / neutral action appearance
+├── Motion       press feedback and panel-transition timing
+└── Sound        recommended source and semantic auxiliary-event cues
+```
 
-`ExperienceThemeID` is persisted in `AppSettingsStore` and currently has two
-profiles:
+This is deliberately different from a CESP/OpenPeon sound pack. A sound pack
+is an optional **audio override**; it never changes the selected theme's UI,
+icons, geometry, or motion.
 
-| Theme | Visual direction | Recommended sound mode |
-| --- | --- | --- |
-| `standard` | restrained macOS-style controls | `builtIn` |
-| `pixel` | square edges and monospaced UI details | `island8Bit` |
+## For users
 
-Selecting a profile applies its recommended sound mode. Users may subsequently
-select a CESP/OpenPeon sound pack; that replaces sound playback only and does
-not silently change the selected visual profile.
+Choose a theme from **Settings → Sound → Experience theme**.
 
-## Sound feedback
+| Theme | Experience |
+| --- | --- |
+| Default | The native macOS-oriented baseline: soft continuous corners, glass-backed settings surfaces, restrained motion, and system-sound recommendations. |
+| Pixel | The reference theme: grid-backed Island and detached surfaces, square controls, pixel action glyphs, higher-contrast semantic controls, and 8-bit sound recommendations. |
 
-The five configurable notification events (`processingStarted`,
-`attentionRequired`, `taskCompleted`, `taskError`, and `resourceLimit`) retain
-their existing per-event setting and enable switch. `AppSoundFeedback` routes
-them back to `AppSettings.playSound(for:)`.
+Selecting a theme applies its recommended sound mode. The five notification
+stages—processing, attention, completion, error, and resource limit—remain
+individually configurable in the Sound settings. A user can also select a local
+CESP/OpenPeon pack afterwards; that replaces audio playback only.
 
-Auxiliary events—client start, detached presentation, allow, scoped allow, and
-deny—use the active sound mode. CESP v1 has no dedicated approval categories,
-so those events map to compatible existing categories until the format defines
-semantic approval categories. Keep those fallback mappings in
-`AppSoundFeedbackEvent`, not in SwiftUI views.
+Confirmation actions retain one meaning in every theme:
 
-## Confirmation controls
+- Green: allow this operation.
+- Blue: allow within the current scope or session.
+- Red: deny the operation.
+- Gray/white: neutral hand-off actions, such as opening the originating app.
 
-Use `ConfirmationActionButton` for actions that resolve a pending operation:
+Buttons also retain text labels, icons, accessibility hints, and reduced-motion
+safe press feedback; color is never the only indication of meaning.
 
-- `.approve` is green and plays accepted feedback.
-- `.scopedApproval` is blue and plays scoped-allow feedback.
-- `.deny` is red and plays rejection feedback.
-- `.neutral` remains gray/white and does not imply approval or rejection.
+## Architecture
 
-Each role includes a visible icon and an accessibility hint; color is a
-reinforcement, never the sole indication of action meaning. New confirmation
-surfaces should use the shared role rather than adding per-screen colors.
+The source is intentionally divided by responsibility:
+
+```text
+PingIsland/Core/
+├── ExperienceThemeID.swift        persisted ID and action semantics
+└── AppSoundFeedback.swift         semantic lifecycle/action event entry point
+
+PingIsland/UI/Themes/
+├── ExperienceTheme.swift          token contract and SwiftUI Environment key
+├── DefaultExperienceTheme.swift   Default implementation
+├── PixelExperienceTheme.swift     Pixel reference implementation
+└── ExperienceThemeRegistry.swift  built-in registration point
+
+PingIsland/UI/Components/
+└── ExperienceThemeComponents.swift shared themed confirmation controls/previews
+```
+
+`AppLocalizedRootView` injects the selected `IslandExperienceTheme` into the
+SwiftUI environment. Any child view reads `@Environment(\.islandExperienceTheme)`
+instead of reaching into settings or defining a local palette. This lets docked
+Island, detached bubbles, settings surfaces, and confirmation controls react to
+one persisted selection.
+
+Session and UI code emits `AppSoundFeedbackEvent`, not a filename. The five
+configurable lifecycle events still route through `AppSettings.playSound(for:)`.
+For auxiliary events—client start, detached presentation, allow, scoped allow,
+and deny—the active theme supplies a `ExperienceThemeSoundCue`.
+
+CESP v1 has no dedicated approval or detached-presentation categories. Theme
+sound profiles therefore define a documented fallback to compatible existing
+categories when a CESP pack is active. Keep that compatibility behavior in the
+sound profile, never in an individual SwiftUI view.
+
+## Adding a built-in theme
+
+Themes are code-defined in this release; third-party UI theme bundles are not a
+runtime extension point yet. To add a first-party theme:
+
+1. Add a stable persisted case to `ExperienceThemeID` and its recommended sound
+   mode. Do not rename an existing raw value.
+2. Create `PingIsland/UI/Themes/<Name>ExperienceTheme.swift` with one complete
+   `IslandExperienceTheme` definition. Supply every Visual, Interaction, Motion,
+   and auxiliary Sound token.
+3. Register the definition in `ExperienceThemeRegistry.all`.
+4. Use semantic components such as `ConfirmationActionButton`; do not add
+   per-screen approval colors or direct bundled sound names.
+5. Add registry and sound-profile assertions to `PingIslandTests/ExperienceThemeTests.swift`.
+6. Update the user-facing theme table in `README.md` and this document.
+
+The `PixelExperienceTheme` is the reference implementation. It demonstrates
+surface treatment, geometry, icon rendering, action roles, motion values, and
+sound cues in a single definition file.
 
 ## Verification
 
-`PingIslandTests/ExperienceThemeTests.swift` covers the stable theme contract,
-semantic sound mappings, and distinct confirmation roles.
-`AppSettingsPersistenceTests` verifies theme persistence and recommended sound
-mode application.
+`PingIslandTests/ExperienceThemeTests.swift` verifies that:
+
+- every persisted theme ID is registered exactly once;
+- Default and Pixel keep distinct visual contracts;
+- profile recommendations match persisted selection behavior;
+- every auxiliary event has a cue in every built-in theme; and
+- confirmation roles keep distinct semantic intent.
+
+`AppSettingsPersistenceTests` verifies theme persistence and application of the
+recommended sound mode. Run the app-level test target as well as the Prototype
+suite before release.

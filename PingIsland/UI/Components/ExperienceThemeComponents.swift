@@ -1,12 +1,14 @@
 import SwiftUI
 
+/// Shared control for decisions that resolve a pending operation. Its visual
+/// meaning comes from the current experience theme, not from each call site.
 struct ConfirmationActionButton: View {
     let title: String
     let role: ConfirmationActionRole
     var compact = false
     let action: () -> Void
 
-    @ObservedObject private var settings = AppSettings.shared
+    @Environment(\.islandExperienceTheme) private var theme
 
     var body: some View {
         Button {
@@ -16,11 +18,16 @@ struct ConfirmationActionButton: View {
             action()
         } label: {
             HStack(spacing: compact ? 4 : 6) {
-                Image(systemName: role.systemImage)
-                    .font(.system(size: compact ? 9 : 11, weight: .bold, design: symbolDesign))
+                ConfirmationActionSymbol(role: role, compact: compact)
 
                 Text(title)
-                    .font(.system(size: compact ? 10 : 12, weight: .semibold, design: textDesign))
+                    .font(
+                        .system(
+                            size: compact ? 10 : 12,
+                            weight: .semibold,
+                            design: theme.visual.controlFontDesign
+                        )
+                    )
             }
             .lineLimit(1)
             .padding(.horizontal, compact ? 8 : 12)
@@ -28,21 +35,15 @@ struct ConfirmationActionButton: View {
         }
         .buttonStyle(
             ConfirmationActionButtonStyle(
-                palette: ConfirmationActionPalette(role: role),
-                isPixelTheme: settings.experienceThemeID == .pixel,
-                compact: compact
+                appearance: theme.interaction.appearance(for: role),
+                cornerRadius: compact
+                    ? min(13, theme.visual.controlCornerRadius)
+                    : theme.visual.controlCornerRadius,
+                motion: theme.motion
             )
         )
         .accessibilityLabel(title)
         .accessibilityHint(accessibilityHint)
-    }
-
-    private var symbolDesign: Font.Design {
-        settings.experienceThemeID == .pixel ? .monospaced : .default
-    }
-
-    private var textDesign: Font.Design {
-        settings.experienceThemeID == .pixel ? .monospaced : .rounded
     }
 
     private var accessibilityHint: String {
@@ -60,16 +61,20 @@ struct ConfirmationActionButton: View {
 }
 
 struct ExperienceThemeOptionCard: View {
-    let theme: ExperienceThemeID
+    let themeID: ExperienceThemeID
     let isSelected: Bool
     let action: () -> Void
+
+    private var theme: IslandExperienceTheme {
+        ExperienceThemeRegistry.theme(for: themeID)
+    }
 
     var body: some View {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(theme.title)
-                        .font(.system(size: 14, weight: .semibold, design: theme == .pixel ? .monospaced : .rounded))
+                    Text(theme.metadata.displayName)
+                        .font(.system(size: 14, weight: .semibold, design: theme.visual.controlFontDesign))
 
                     Spacer(minLength: 0)
 
@@ -78,10 +83,11 @@ struct ExperienceThemeOptionCard: View {
                 }
 
                 ExperienceThemePreview(theme: theme)
+                    .environment(\.islandExperienceTheme, theme)
 
-                Text(theme.subtitle)
+                Text(theme.metadata.description)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(theme.visual.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
@@ -93,82 +99,108 @@ struct ExperienceThemeOptionCard: View {
                 isSelected: isSelected
             )
         )
-        .accessibilityLabel("\(theme.title) 体验主题")
+        .accessibilityLabel("\(theme.metadata.displayName) 体验主题")
         .accessibilityValue(isSelected ? "已选择" : "未选择")
     }
 }
 
-private struct ConfirmationActionPalette {
-    let background: Color
-    let border: Color
-
-    init(role: ConfirmationActionRole) {
-        switch role {
-        case .approve:
-            background = Color(red: 0.12, green: 0.52, blue: 0.30)
-            border = Color(red: 0.39, green: 0.86, blue: 0.56)
-        case .scopedApproval:
-            background = Color(red: 0.13, green: 0.36, blue: 0.74)
-            border = Color(red: 0.43, green: 0.67, blue: 1.00)
-        case .deny:
-            background = Color(red: 0.67, green: 0.20, blue: 0.24)
-            border = Color(red: 1.00, green: 0.49, blue: 0.51)
-        case .neutral:
-            background = Color.white.opacity(0.12)
-            border = Color.white.opacity(0.24)
-        }
-    }
-}
-
 private struct ConfirmationActionButtonStyle: ButtonStyle {
-    let palette: ConfirmationActionPalette
-    let isPixelTheme: Bool
-    let compact: Bool
+    let appearance: ConfirmationActionAppearance
+    let cornerRadius: CGFloat
+    let motion: ExperienceThemeMotionTokens
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(Color.white.opacity(configuration.isPressed ? 0.82 : 1))
+            .foregroundStyle(appearance.foreground.opacity(configuration.isPressed ? 0.82 : 1))
             .background {
-                RoundedRectangle(
-                    cornerRadius: isPixelTheme ? 2 : (compact ? 13 : 18),
-                    style: isPixelTheme ? .circular : .continuous
-                )
-                .fill(palette.background.opacity(configuration.isPressed ? 0.76 : 1))
+                RoundedRectangle(cornerRadius: cornerRadius, style: cornerRadius <= 3 ? .circular : .continuous)
+                    .fill(appearance.background.opacity(configuration.isPressed ? 0.76 : 1))
             }
             .overlay {
-                RoundedRectangle(
-                    cornerRadius: isPixelTheme ? 2 : (compact ? 13 : 18),
-                    style: isPixelTheme ? .circular : .continuous
-                )
-                .strokeBorder(palette.border.opacity(configuration.isPressed ? 0.55 : 0.82), lineWidth: 1)
+                RoundedRectangle(cornerRadius: cornerRadius, style: cornerRadius <= 3 ? .circular : .continuous)
+                    .strokeBorder(appearance.border.opacity(configuration.isPressed ? 0.55 : 0.82), lineWidth: 1)
             }
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.98 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.1), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? motion.controlPressScale : 1)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: motion.controlPressDuration),
+                value: configuration.isPressed
+            )
+    }
+}
+
+private struct ConfirmationActionSymbol: View {
+    let role: ConfirmationActionRole
+    let compact: Bool
+    @Environment(\.islandExperienceTheme) private var theme
+
+    var body: some View {
+        if theme.visual.usesPixelGrid {
+            PixelActionGlyph(role: role)
+                .frame(width: compact ? 10 : 12, height: compact ? 10 : 12)
+        } else {
+            Image(systemName: role.systemImage)
+                .font(.system(size: compact ? 9 : 11, weight: .bold, design: .default))
+        }
+    }
+}
+
+private struct PixelActionGlyph: View {
+    let role: ConfirmationActionRole
+    @Environment(\.islandExperienceTheme) private var theme
+
+    var body: some View {
+        Canvas { context, size in
+            let unit = min(size.width, size.height) / 7
+            let path = pixelPath(unit: unit)
+            context.fill(path, with: .color(theme.interaction.appearance(for: role).foreground))
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func pixelPath(unit: CGFloat) -> Path {
+        var path = Path()
+        for point in points {
+            path.addRect(CGRect(x: CGFloat(point.x) * unit, y: CGFloat(point.y) * unit, width: unit, height: unit))
+        }
+        return path
+    }
+
+    private var points: [(x: Int, y: Int)] {
+        switch role {
+        case .approve:
+            return [(1, 3), (2, 4), (3, 5), (4, 4), (5, 3), (6, 2), (5, 1)]
+        case .scopedApproval:
+            return [(2, 1), (3, 1), (1, 2), (5, 2), (1, 3), (5, 3), (2, 4), (3, 5), (4, 4), (5, 5)]
+        case .deny:
+            return [(1, 1), (5, 1), (2, 2), (4, 2), (3, 3), (2, 4), (4, 4), (1, 5), (5, 5)]
+        case .neutral:
+            return [(1, 2), (2, 2), (3, 2), (4, 2), (4, 1), (5, 1), (5, 2), (3, 3), (3, 4), (3, 5)]
+        }
     }
 }
 
 private struct ExperienceThemeOptionCardStyle: ButtonStyle {
-    let theme: ExperienceThemeID
+    let theme: IslandExperienceTheme
     let isSelected: Bool
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isSelected ? Color.primary : Color.primary.opacity(0.84))
+            .foregroundStyle(isSelected ? theme.visual.primaryText : theme.visual.primaryText.opacity(0.84))
             .background {
                 RoundedRectangle(
-                    cornerRadius: theme == .pixel ? 3 : 14,
-                    style: theme == .pixel ? .circular : .continuous
+                    cornerRadius: theme.visual.sectionCornerRadius,
+                    style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
                 )
-                .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.045))
+                .fill(isSelected ? theme.visual.accent.opacity(0.16) : theme.visual.previewSurface)
             }
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: theme == .pixel ? 3 : 14,
-                    style: theme == .pixel ? .circular : .continuous
+                    cornerRadius: theme.visual.sectionCornerRadius,
+                    style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
                 )
                 .strokeBorder(
-                    isSelected ? Color.accentColor.opacity(0.8) : Color.primary.opacity(0.10),
+                    isSelected ? theme.visual.accent.opacity(0.88) : theme.visual.settingsCardBorder,
                     lineWidth: isSelected ? 1.5 : 1
                 )
             }
@@ -177,7 +209,7 @@ private struct ExperienceThemeOptionCardStyle: ButtonStyle {
 }
 
 private struct ExperienceThemePreview: View {
-    let theme: ExperienceThemeID
+    let theme: IslandExperienceTheme
 
     var body: some View {
         VStack(spacing: 5) {
@@ -186,63 +218,36 @@ private struct ExperienceThemePreview: View {
                 Circle().fill(Color.yellow.opacity(0.86))
                 Circle().fill(Color.green.opacity(0.86))
                 Spacer()
-                RoundedRectangle(cornerRadius: theme == .pixel ? 1 : 3)
-                    .fill(Color.white.opacity(0.36))
+                RoundedRectangle(cornerRadius: theme.visual.controlCornerRadius <= 3 ? 1 : 3)
+                    .fill(theme.visual.secondaryText.opacity(0.52))
                     .frame(width: 28, height: 5)
             }
             .frame(height: 9)
 
             HStack(spacing: 4) {
-                theme == .pixel
-                    ? Color(red: 0.08, green: 0.12, blue: 0.18)
-                    : Color.primary.opacity(0.10)
+                theme.visual.previewSidebarSurface
 
                 VStack(spacing: 4) {
                     HStack(spacing: 3) {
-                        Color(red: 0.12, green: 0.52, blue: 0.30)
-                        Color(red: 0.13, green: 0.36, blue: 0.74)
-                        Color(red: 0.67, green: 0.20, blue: 0.24)
+                        theme.interaction.approve.background
+                        theme.interaction.scopedApproval.background
+                        theme.interaction.deny.background
                     }
                     .frame(height: 7)
 
-                    RoundedRectangle(cornerRadius: theme == .pixel ? 1 : 3)
-                        .fill(Color.primary.opacity(0.18))
+                    RoundedRectangle(cornerRadius: theme.visual.controlCornerRadius <= 3 ? 1 : 3)
+                        .fill(theme.visual.primaryText.opacity(0.18))
                         .frame(height: 5)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: theme == .pixel ? 1 : 6))
+            .clipShape(RoundedRectangle(cornerRadius: theme.visual.sectionCornerRadius))
             .frame(height: 28)
         }
         .padding(7)
-        .background(previewBackground)
-    }
-
-    @ViewBuilder
-    private var previewBackground: some View {
-        if theme == .pixel {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(Color(red: 0.04, green: 0.07, blue: 0.10))
-                .overlay {
-                    Canvas { context, size in
-                        let step: CGFloat = 5
-                        for x in stride(from: 0, through: size.width, by: step) {
-                            context.stroke(
-                                Path(CGRect(x: x, y: 0, width: 0.5, height: size.height)),
-                                with: .color(.white.opacity(0.07))
-                            )
-                        }
-                        for y in stride(from: 0, through: size.height, by: step) {
-                            context.stroke(
-                                Path(CGRect(x: 0, y: y, width: size.width, height: 0.5)),
-                                with: .color(.white.opacity(0.07))
-                            )
-                        }
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                }
-        } else {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(Color.primary.opacity(0.055))
+        .background {
+            RoundedRectangle(cornerRadius: theme.visual.sectionCornerRadius)
+                .fill(theme.visual.previewSurface)
+                .overlay(ExperienceThemeGridOverlay())
         }
     }
 }

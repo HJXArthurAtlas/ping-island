@@ -2,7 +2,7 @@ import Foundation
 
 /// Domain events used by the UI and session lifecycle. Callers describe what
 /// happened; the selected experience and sound mode decide how it sounds.
-enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable {
+enum AppSoundFeedbackEvent: CaseIterable, Identifiable, Equatable, Hashable {
     case clientStarted
     case islandDetached
     case processingStarted
@@ -126,10 +126,17 @@ enum AppSoundFeedback {
             return
         }
 
-        AppSettings.playAuxiliarySound(
+        let theme = ExperienceThemeRegistry.theme(for: AppSettings.experienceThemeID)
+        let cue = theme.sound.cue(for: event) ?? ExperienceThemeSoundCue(
             systemSound: event.builtInFallbackSound,
             island8BitSound: event.island8BitSound,
             soundPackFallback: event.soundPackFallbackEvent
+        )
+
+        AppSettings.playAuxiliarySound(
+            systemSound: cue.systemSound,
+            island8BitSound: cue.island8BitSound,
+            soundPackFallback: cue.soundPackFallback
         )
     }
 }

@@ -1198,12 +1198,16 @@ private struct DetachedFloatingMascotView: View {
 private struct DetachedIslandBubbleChrome<Content: View>: View {
     let placement: DetachedIslandBubblePlacement
     @ViewBuilder let content: Content
+    @Environment(\.islandExperienceTheme) private var theme
 
     var body: some View {
         let shape = DetachedIslandBubbleShape(placement: placement)
 
         ZStack(alignment: .topLeading) {
-            shape.fill(Color.black)
+            shape.fill(theme.visual.detachedSurface)
+
+            ExperienceThemeGridOverlay()
+                .mask(shape)
 
             content
                 .padding(.horizontal, DetachedIslandPanelMetrics.bubbleHorizontalPadding)

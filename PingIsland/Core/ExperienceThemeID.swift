@@ -1,32 +1,12 @@
 import Foundation
 
-/// A cohesive presentation profile for Ping Island's visual, interaction, and
-/// sound feedback layers. The selected profile is intentionally separate from
-/// a user-imported CESP sound pack: a pack may replace audio without changing
-/// the visual experience.
+/// Stable persisted identity for a compiled-in experience theme. Visual tokens
+/// and sound cues live with each implementation under `UI/Themes/`.
 enum ExperienceThemeID: String, CaseIterable, Identifiable {
     case standard
     case pixel
 
     var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .standard:
-            return "默认"
-        case .pixel:
-            return "Pixel"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .standard:
-            return "克制、清晰的 macOS 体验，适合长时间使用。"
-        case .pixel:
-            return "像素化边框、图标与 8-bit 提示反馈，作为完整体验示例。"
-        }
-    }
 
     var recommendedSoundThemeMode: SoundThemeMode {
         switch self {

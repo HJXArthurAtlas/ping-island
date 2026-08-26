@@ -677,7 +677,7 @@ private struct SoundSettingsContent: View {
                     HStack(spacing: 10) {
                         ForEach(ExperienceThemeID.allCases) { theme in
                             ExperienceThemeOptionCard(
-                                theme: theme,
+                                themeID: theme,
                                 isSelected: settings.experienceThemeID == theme
                             ) {
                                 AppSettings.applyExperienceTheme(theme)
@@ -2527,6 +2527,7 @@ private struct SettingsPanelContentView: View {
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var remoteManager = RemoteConnectorManager.shared
+    @Environment(\.islandExperienceTheme) private var theme
     @State private var selectedCategory: SettingsCategory? = .general
     @State private var pendingHookReinstallProfile: ManagedHookClientProfile?
     @State private var pendingHookOptionsRequest: HookInstallOptionsRequest?
@@ -2564,9 +2565,23 @@ private struct SettingsPanelContentView: View {
                 alignment: .topLeading
             )
         }
-        .background(panelBackgroundColor)
+        .background(theme.visual.settingsSurface)
+        .overlay {
+            ExperienceThemeGridOverlay()
+                .clipShape(
+                    RoundedRectangle(
+                        cornerRadius: theme.visual.settingsCornerRadius,
+                        style: theme.visual.settingsCornerRadius <= 4 ? .circular : .continuous
+                    )
+                )
+        }
         .ignoresSafeArea()
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: theme.visual.settingsCornerRadius,
+                style: theme.visual.settingsCornerRadius <= 4 ? .circular : .continuous
+            )
+        )
         .preferredColorScheme(.dark)
         .environment(\.mascotAnimationsEnabled, arePreviewAnimationsActive)
         .onAppear {
@@ -2773,10 +2788,6 @@ private struct SettingsPanelContentView: View {
         }
     }
 
-    private var panelBackgroundColor: Color {
-        .clear
-    }
-
     private var contentTopInset: CGFloat {
         switch presentation {
         case .window:
@@ -2836,31 +2847,31 @@ private struct SettingsPanelContentView: View {
         .padding(8)
         .background(
             UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
+                topLeadingRadius: theme.visual.settingsCornerRadius,
+                bottomLeadingRadius: theme.visual.settingsCornerRadius,
                 bottomTrailingRadius: 0,
                 topTrailingRadius: 0,
-                style: .continuous
+                style: theme.visual.usesPixelGrid ? .circular : .continuous
             )
-                .fill(Color.white.opacity(0.055))
+                .fill(theme.visual.settingsSidebarSurface)
                 .overlay {
                     SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
                         .clipShape(
                             UnevenRoundedRectangle(
-                                topLeadingRadius: 24,
-                                bottomLeadingRadius: 24,
+                                topLeadingRadius: theme.visual.settingsCornerRadius,
+                                bottomLeadingRadius: theme.visual.settingsCornerRadius,
                                 bottomTrailingRadius: 0,
                                 topTrailingRadius: 0,
-                                style: .continuous
+                                style: theme.visual.usesPixelGrid ? .circular : .continuous
                             )
                         )
-                        .opacity(0.94)
+                        .opacity(theme.visual.usesGlassMaterial ? 0.94 : 0)
                 }
                 .overlay {
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.12),
-                            Color.white.opacity(0.04),
+                            theme.visual.primaryText.opacity(0.12),
+                            theme.visual.primaryText.opacity(0.04),
                             Color.black.opacity(0.10)
                         ],
                         startPoint: .topLeading,
@@ -2868,17 +2879,17 @@ private struct SettingsPanelContentView: View {
                     )
                     .clipShape(
                         UnevenRoundedRectangle(
-                            topLeadingRadius: 24,
-                            bottomLeadingRadius: 24,
+                            topLeadingRadius: theme.visual.settingsCornerRadius,
+                            bottomLeadingRadius: theme.visual.settingsCornerRadius,
                             bottomTrailingRadius: 0,
                             topTrailingRadius: 0,
-                            style: .continuous
+                            style: theme.visual.usesPixelGrid ? .circular : .continuous
                         )
                     )
                 }
                 .overlay(alignment: .topTrailing) {
                     Circle()
-                        .fill(Color.white.opacity(0.16))
+                        .fill(theme.visual.accent.opacity(0.16))
                         .frame(width: 120, height: 120)
                         .blur(radius: 36)
                         .offset(x: 28, y: -26)
@@ -2886,13 +2897,13 @@ private struct SettingsPanelContentView: View {
         )
         .overlay(
             UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
+                topLeadingRadius: theme.visual.settingsCornerRadius,
+                bottomLeadingRadius: theme.visual.settingsCornerRadius,
                 bottomTrailingRadius: 0,
                 topTrailingRadius: 0,
-                style: .continuous
+                style: theme.visual.usesPixelGrid ? .circular : .continuous
             )
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                .strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.20), radius: 24, y: 14)
     }
@@ -2965,29 +2976,29 @@ private struct SettingsPanelContentView: View {
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
                 bottomLeadingRadius: 0,
-                bottomTrailingRadius: 26,
-                topTrailingRadius: 26,
-                style: .continuous
+                bottomTrailingRadius: theme.visual.settingsCornerRadius,
+                topTrailingRadius: theme.visual.settingsCornerRadius,
+                style: theme.visual.usesPixelGrid ? .circular : .continuous
             )
-                .fill(Color.white.opacity(0.035))
+                .fill(theme.visual.settingsDetailSurface)
                 .overlay {
                     SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
                         .clipShape(
                             UnevenRoundedRectangle(
                                 topLeadingRadius: 0,
                                 bottomLeadingRadius: 0,
-                                bottomTrailingRadius: 26,
-                                topTrailingRadius: 26,
-                                style: .continuous
+                                bottomTrailingRadius: theme.visual.settingsCornerRadius,
+                                topTrailingRadius: theme.visual.settingsCornerRadius,
+                                style: theme.visual.usesPixelGrid ? .circular : .continuous
                             )
                         )
-                        .opacity(0.96)
+                        .opacity(theme.visual.usesGlassMaterial ? 0.96 : 0)
                 }
                 .overlay {
                     LinearGradient(
                         colors: [
-                            Color.white.opacity(0.11),
-                            Color.white.opacity(0.03),
+                            theme.visual.primaryText.opacity(0.11),
+                            theme.visual.primaryText.opacity(0.03),
                             Color.black.opacity(0.05)
                         ],
                         startPoint: .topLeading,
@@ -2997,9 +3008,9 @@ private struct SettingsPanelContentView: View {
                         UnevenRoundedRectangle(
                             topLeadingRadius: 0,
                             bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 26,
-                            topTrailingRadius: 26,
-                            style: .continuous
+                            bottomTrailingRadius: theme.visual.settingsCornerRadius,
+                            topTrailingRadius: theme.visual.settingsCornerRadius,
+                            style: theme.visual.usesPixelGrid ? .circular : .continuous
                         )
                     )
                 }
@@ -3008,11 +3019,11 @@ private struct SettingsPanelContentView: View {
             UnevenRoundedRectangle(
                 topLeadingRadius: 0,
                 bottomLeadingRadius: 0,
-                bottomTrailingRadius: 26,
-                topTrailingRadius: 26,
-                style: .continuous
+                bottomTrailingRadius: theme.visual.settingsCornerRadius,
+                topTrailingRadius: theme.visual.settingsCornerRadius,
+                style: theme.visual.usesPixelGrid ? .circular : .continuous
             )
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                .strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.16), radius: 24, y: 14)
     }
@@ -4188,6 +4199,7 @@ private struct SettingsSectionCard<Content: View>: View {
     let title: String
     private let titleAccessory: AnyView?
     private let content: Content
+    @Environment(\.islandExperienceTheme) private var theme
 
     init(title: String, @ViewBuilder content: () -> Content) {
         self.title = title
@@ -4210,7 +4222,7 @@ private struct SettingsSectionCard<Content: View>: View {
             HStack(alignment: .center, spacing: 12) {
                 Text(appLocalized: title)
                     .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(theme.visual.primaryText)
 
                 Spacer(minLength: 12)
 
@@ -4224,20 +4236,33 @@ private struct SettingsSectionCard<Content: View>: View {
                 content
             }
             .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.white.opacity(0.045))
+                RoundedRectangle(
+                    cornerRadius: theme.visual.sectionCornerRadius,
+                    style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
+                )
+                    .fill(theme.visual.settingsCardSurface)
+                    .overlay {
+                        if theme.visual.usesGlassMaterial {
+                            SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
+                                .clipShape(
+                                    RoundedRectangle(
+                                        cornerRadius: theme.visual.sectionCornerRadius,
+                                        style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
+                                    )
+                                )
+                                .opacity(0.96)
+                        }
+                    }
                     .overlay(
-                        SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                            .opacity(0.96)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        RoundedRectangle(
+                            cornerRadius: theme.visual.sectionCornerRadius,
+                            style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
+                        )
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.08),
-                                        Color.white.opacity(0.025),
+                                        theme.visual.primaryText.opacity(0.08),
+                                        theme.visual.primaryText.opacity(0.025),
                                         Color.black.opacity(0.04)
                                     ],
                                     startPoint: .topLeading,
@@ -4247,8 +4272,11 @@ private struct SettingsSectionCard<Content: View>: View {
                     )
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.11), lineWidth: 1)
+                RoundedRectangle(
+                    cornerRadius: theme.visual.sectionCornerRadius,
+                    style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
+                )
+                    .strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(0.16), radius: 18, y: 10)
         }
