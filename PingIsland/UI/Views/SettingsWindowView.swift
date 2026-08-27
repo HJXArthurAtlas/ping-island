@@ -64,6 +64,21 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         }
     }
 
+    var macOSIcon: String {
+        switch self {
+        case .general: return "gearshape"
+        case .shortcuts: return "command"
+        case .display: return "display"
+        case .mascot: return "pawprint"
+        case .sound: return "speaker.wave.2"
+        case .analytics: return "chart.bar.xaxis"
+        case .integration: return "link"
+        case .remote: return "network"
+        case .labs: return "flask"
+        case .about: return "info.circle"
+        }
+    }
+
     var tint: Color {
         switch self {
         case .general: return Color(red: 0.12, green: 0.42, blue: 0.95)
@@ -105,13 +120,12 @@ struct QoderCLIHookRefreshNoticeGate {
     }
 }
 
-struct ClosedNotchUsageAvailability: Equatable {
+struct ClosedNotchUsageAvailability: Equatable, Sendable {
     var hasClaudeSevenDay = false
     var hasCodexSevenDay = false
 
-    @MainActor
-    static func current() -> ClosedNotchUsageAvailability {
-        guard AppSettings.showUsage else {
+    nonisolated static func load(showUsage: Bool) -> ClosedNotchUsageAvailability {
+        guard showUsage else {
             return ClosedNotchUsageAvailability()
         }
 
@@ -195,6 +209,11 @@ final class SettingsPanelViewModel: ObservableObject {
     )
 
     private var hookFeedbackClearTasks: [String: Task<Void, Never>] = [:]
+    private var lastCategoryRefreshDates: [SettingsCategory: Date] = [:]
+    private let categoryRefreshInterval: TimeInterval
+    private let categoryRefreshClock: @MainActor () -> Date
+    private let closedNotchUsageAvailabilityLoader: @MainActor (Bool) async -> ClosedNotchUsageAvailability
+    private let soundPackRefreshProvider: @MainActor () async -> Void
     private let qoderCLIHookRefreshStatusProvider: @MainActor () -> HookInstaller.QoderCLIHookRefreshStatus?
     private let qoderCLIHookRefreshNoticeGate: QoderCLIHookRefreshNoticeGate
     private let accessibilityStatusProvider: @MainActor (_ prompt: Bool) -> Bool
@@ -213,6 +232,16 @@ final class SettingsPanelViewModel: ObservableObject {
                 return
             }
             NSWorkspace.shared.open(url)
+        },
+        categoryRefreshInterval: TimeInterval = 5,
+        categoryRefreshClock: @escaping @MainActor () -> Date = Date.init,
+        closedNotchUsageAvailabilityLoader: @escaping @MainActor (Bool) async -> ClosedNotchUsageAvailability = { showUsage in
+            await Task.detached(priority: .userInitiated) {
+                ClosedNotchUsageAvailability.load(showUsage: showUsage)
+            }.value
+        },
+        soundPackRefreshProvider: @escaping @MainActor () async -> Void = {
+            await SoundPackCatalog.shared.refreshInBackground()
         }
     ) {
         self.qoderCLIHookRefreshStatusProvider = qoderCLIHookRefreshStatusProvider
@@ -221,6 +250,10 @@ final class SettingsPanelViewModel: ObservableObject {
         )
         self.accessibilityStatusProvider = accessibilityStatusProvider
         self.accessibilitySettingsOpener = accessibilitySettingsOpener
+        self.categoryRefreshInterval = categoryRefreshInterval
+        self.categoryRefreshClock = categoryRefreshClock
+        self.closedNotchUsageAvailabilityLoader = closedNotchUsageAvailabilityLoader
+        self.soundPackRefreshProvider = soundPackRefreshProvider
     }
 
     var visibleHookProfiles: [ManagedHookClientProfile] {
@@ -254,17 +287,20 @@ final class SettingsPanelViewModel: ObservableObject {
         refreshLocalizedState()
     }
 
-    func refresh(for category: SettingsCategory) {
-        launchAtLogin = SMAppService.mainApp.status == .enabled
-        refreshAccessibilityStatus()
-        refreshLocalizedState()
+    func refresh(for category: SettingsCategory, force: Bool = false) async {
+        let refreshDate = categoryRefreshClock()
+        if !force,
+           let lastRefresh = lastCategoryRefreshDates[category],
+           refreshDate.timeIntervalSince(lastRefresh) < categoryRefreshInterval {
+            return
+        }
 
         switch category {
         case .display:
             ScreenSelector.shared.refreshScreens()
-            refreshClosedNotchUsageAvailability()
+            await refreshClosedNotchUsageAvailability()
         case .sound:
-            SoundPackCatalog.shared.refresh()
+            await soundPackRefreshProvider()
         case .integration:
             refreshHookInstallationStates()
             refreshIDEExtensionInstallationStates()
@@ -274,6 +310,9 @@ final class SettingsPanelViewModel: ObservableObject {
         case .general, .shortcuts, .mascot, .analytics, .remote, .labs, .about:
             break
         }
+
+        guard !Task.isCancelled else { return }
+        lastCategoryRefreshDates[category] = refreshDate
     }
 
     func refreshAccessibilityStatus() {
@@ -311,8 +350,11 @@ final class SettingsPanelViewModel: ObservableObject {
         qoderCLIHookRefreshNoticeStatus = status
     }
 
-    func refreshClosedNotchUsageAvailability() {
-        closedNotchUsageAvailability = ClosedNotchUsageAvailability.current()
+    func refreshClosedNotchUsageAvailability() async {
+        let showUsage = AppSettings.showUsage
+        let availability = await closedNotchUsageAvailabilityLoader(showUsage)
+        guard !Task.isCancelled else { return }
+        closedNotchUsageAvailability = availability
     }
 
     func refreshBridgeHealthStatus() {
@@ -908,8 +950,9 @@ private final class AgentUsageAnalyticsViewModel: ObservableObject {
 
     private var refreshTask: Task<Void, Never>?
 
-    var isInitialLoading: Bool {
-        isRefreshing && !hasLoadedSnapshot
+    func refreshIfNeeded() {
+        guard !hasLoadedSnapshot, !isRefreshing else { return }
+        refresh()
     }
 
     func refresh() {
@@ -950,7 +993,7 @@ private final class AgentUsageAnalyticsViewModel: ObservableObject {
 }
 
 private struct AgentUsageAnalyticsContent: View {
-    @StateObject private var viewModel = AgentUsageAnalyticsViewModel()
+    @ObservedObject var viewModel: AgentUsageAnalyticsViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -991,16 +1034,6 @@ private struct AgentUsageAnalyticsContent: View {
                 )
                 .frame(maxWidth: .infinity)
             }
-        }
-        .overlay {
-            if viewModel.isInitialLoading {
-                AgentUsageLoadingOverlay()
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.18), value: viewModel.isInitialLoading)
-        .onAppear {
-            viewModel.refresh()
         }
     }
 
@@ -1088,42 +1121,6 @@ private struct AgentUsageAnalyticsContent: View {
             .padding(.horizontal, 18)
             .padding(.vertical, 8)
         }
-    }
-}
-
-private struct AgentUsageLoadingOverlay: View {
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color.black.opacity(0.22))
-                .background(
-                    SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                        .opacity(0.90)
-                )
-
-            VStack(spacing: 10) {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(.white.opacity(0.84))
-
-                Text(appLocalized: "正在加载统计")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.72))
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 14)
-            .background(
-                Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.08))
-                    .overlay(
-                        Capsule(style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-                    )
-            )
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .allowsHitTesting(true)
     }
 }
 
@@ -2437,50 +2434,6 @@ private enum AgentUsageFormat {
     }
 }
 
-private struct SettingsCategoryLoadingView: View {
-    let category: SettingsCategory
-
-    var body: some View {
-        SettingsSectionCard(title: category.title) {
-            VStack(spacing: 12) {
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(.white.opacity(0.82))
-
-                Text(verbatim: loadingTitle)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.88))
-
-                Text(verbatim: loadingSubtitle)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.white.opacity(0.54))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, minHeight: 180)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 24)
-        }
-    }
-
-    private var loadingTitle: String {
-        AppLocalization.format("正在加载%@设置…", AppLocalization.string(category.title))
-    }
-
-    private var loadingSubtitle: String {
-        switch category {
-        case .display:
-            return AppLocalization.string("正在刷新显示器与用量展示状态")
-        case .sound:
-            return AppLocalization.string("正在扫描可用声音主题包")
-        case .integration:
-            return AppLocalization.string("正在检查 Hooks、IDE 扩展与客户端安装状态")
-        case .general, .shortcuts, .mascot, .analytics, .remote, .labs, .about:
-            return AppLocalization.string("马上就好")
-        }
-    }
-}
-
 private struct SettingsSidebarSection: Identifiable {
     let title: String?
     let categories: [SettingsCategory]
@@ -2508,22 +2461,6 @@ private struct SettingsGlassSurface: NSViewRepresentable {
     }
 }
 
-private struct SettingsWindowDragHandle: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        DragHandleView()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    private final class DragHandleView: NSView {
-        override var mouseDownCanMoveWindow: Bool { false }
-
-        override func mouseDown(with event: NSEvent) {
-            window?.performDrag(with: event)
-        }
-    }
-}
-
 private enum SettingsPanelMetrics {
     static let windowSize = AppSettings.defaultSettingsWindowSize
     static let windowMinSize = AppSettings.minimumSettingsWindowSize
@@ -2531,6 +2468,8 @@ private enum SettingsPanelMetrics {
     static let popoverSize = CGSize(width: 760, height: 620)
     static let windowSidebarWidth: CGFloat = 236
     static let popoverSidebarWidth: CGFloat = 212
+    static let windowSidebarTopInset: CGFloat = 56
+    static let windowDetailTopInset: CGFloat = 56
     static let windowContentTopInset: CGFloat = 0
     static let popoverContentTopInset: CGFloat = 0
     static let outerPadding: CGFloat = 0
@@ -2539,15 +2478,16 @@ private enum SettingsPanelMetrics {
 private struct SettingsPanelContentView: View {
     let presentation: SettingsPanelPresentation
     var onClose: (() -> Void)? = nil
-    var onMinimize: (() -> Void)? = nil
 
     @StateObject private var viewModel = SettingsPanelViewModel()
+    @StateObject private var analyticsViewModel = AgentUsageAnalyticsViewModel()
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var remoteManager = RemoteConnectorManager.shared
     @Environment(\.islandExperienceTheme) private var theme
     @State private var selectedCategory: SettingsCategory? = .general
+    @State private var displayedCategory: SettingsCategory = .general
     @State private var pendingHookReinstallProfile: ManagedHookClientProfile?
     @State private var pendingHookOptionsRequest: HookInstallOptionsRequest?
     @State private var showingUninstallAllHooksConfirmation = false
@@ -2558,25 +2498,18 @@ private struct SettingsPanelContentView: View {
     @State private var consecutiveGeneralTapCount = 0
     @State private var isAccessibilityPollingActive = false
     @State private var arePreviewAnimationsActive = false
-    @State private var loadingCategory: SettingsCategory?
+    @State private var categoryPresentationTask: Task<Void, Never>?
     @State private var categoryRefreshTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
-            VStack(spacing: 0) {
-                if presentation == .window,
-                   theme.visual.settingsChromeStyle == .macOS {
-                    macOSWindowToolbar
-                }
+            HStack(spacing: 0) {
+                sidebar
+                    .frame(width: sidebarWidth)
+                    .frame(maxHeight: .infinity, alignment: .top)
 
-                HStack(spacing: 0) {
-                    sidebar
-                        .frame(width: sidebarWidth)
-                        .frame(maxHeight: .infinity, alignment: .top)
-
-                    detail
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                }
+                detail
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
             .padding(.top, contentTopInset)
             .padding(.horizontal, SettingsPanelMetrics.outerPadding)
@@ -2596,16 +2529,16 @@ private struct SettingsPanelContentView: View {
             ExperienceThemeGridOverlay()
                 .clipShape(
                     RoundedRectangle(
-                        cornerRadius: theme.visual.settingsCornerRadius,
-                        style: theme.visual.settingsCornerRadius <= 4 ? .circular : .continuous
+                        cornerRadius: panelCornerRadius,
+                        style: theme.visual.usesPixelGrid ? .circular : .continuous
                     )
                 )
         }
         .ignoresSafeArea()
         .clipShape(
             RoundedRectangle(
-                cornerRadius: theme.visual.settingsCornerRadius,
-                style: theme.visual.settingsCornerRadius <= 4 ? .circular : .continuous
+                cornerRadius: panelCornerRadius,
+                style: theme.visual.usesPixelGrid ? .circular : .continuous
             )
         )
         .preferredColorScheme(theme.visual.preferredColorScheme)
@@ -2616,15 +2549,16 @@ private struct SettingsPanelContentView: View {
             isAccessibilityPollingActive = isVisible
             arePreviewAnimationsActive = isVisible
 
-            scheduleCategoryRefresh(for: currentCategory, showLoading: false)
+            scheduleCategoryRefresh(for: currentCategory)
             showAnalyticsConsentPromptIfNeeded()
         }
         .onDisappear {
             isAccessibilityPollingActive = false
             arePreviewAnimationsActive = false
+            categoryPresentationTask?.cancel()
+            categoryPresentationTask = nil
             categoryRefreshTask?.cancel()
             categoryRefreshTask = nil
-            loadingCategory = nil
         }
         .task(id: isAccessibilityPollingActive) {
             guard isAccessibilityPollingActive else { return }
@@ -2643,7 +2577,7 @@ private struct SettingsPanelContentView: View {
             isAccessibilityPollingActive = isVisible
             arePreviewAnimationsActive = isVisible
             if isVisible {
-                scheduleCategoryRefresh(for: currentCategory, showLoading: false)
+                scheduleCategoryRefresh(for: currentCategory)
                 showAnalyticsConsentPromptIfNeeded()
             }
         }
@@ -2657,7 +2591,7 @@ private struct SettingsPanelContentView: View {
             selectSidebarCategory(category)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            scheduleCategoryRefresh(for: currentCategory, showLoading: false)
+            scheduleCategoryRefresh(for: currentCategory, force: true)
         }
         .onChange(of: settings.appLanguage) { _, _ in
             viewModel.refreshLocalizedState()
@@ -2814,6 +2748,31 @@ private struct SettingsPanelContentView: View {
         }
     }
 
+    private var panelCornerRadius: CGFloat {
+        presentation == .window ? 0 : theme.visual.settingsCornerRadius
+    }
+
+    private var sidebarShape: UnevenRoundedRectangle {
+        let radius: CGFloat = presentation == .window ? 0 : theme.visual.settingsCornerRadius
+        return UnevenRoundedRectangle(
+            topLeadingRadius: radius,
+            bottomLeadingRadius: radius,
+            bottomTrailingRadius: 0,
+            topTrailingRadius: 0,
+            style: theme.visual.usesPixelGrid ? .circular : .continuous
+        )
+    }
+
+    private var detailShape: UnevenRoundedRectangle {
+        let radius: CGFloat = presentation == .window ? 0 : theme.visual.settingsCornerRadius
+        return UnevenRoundedRectangle(
+            topLeadingRadius: 0,
+            bottomLeadingRadius: 0,
+            bottomTrailingRadius: radius,
+            topTrailingRadius: radius,
+            style: theme.visual.usesPixelGrid ? .circular : .continuous
+        )
+    }
     private var contentTopInset: CGFloat {
         switch presentation {
         case .window:
@@ -2833,21 +2792,8 @@ private struct SettingsPanelContentView: View {
     }
 
     private var sidebar: some View {
-        sidebarContent
-            .padding(8)
-            .background { sidebarBackground }
-            .overlay { sidebarBorder }
-            .shadow(color: Color.black.opacity(0.20), radius: 24, y: 14)
-    }
-
-    private var sidebarContent: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                if presentation == .window,
-                   theme.visual.settingsChromeStyle != .macOS {
-                    sidebarWindowControls
-                }
-
                 ForEach(sidebarSections) { section in
                     VStack(alignment: .leading, spacing: 8) {
                         if let title = section.title {
@@ -2868,92 +2814,61 @@ private struct SettingsPanelContentView: View {
                                         showsNoticeDot: category == .integration && viewModel.hasIntegrationNotice
                                     )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(SettingsSidebarButtonStyle())
+                                .help(Text(appLocalized: category.subtitle))
                                 .accessibilityIdentifier("settings.sidebar.\(category.rawValue)")
+                                .accessibilityLabel(Text(appLocalized: category.title))
+                                .accessibilityHint(Text(appLocalized: category.subtitle))
+                                .accessibilityAddTraits(
+                                    selectedCategory == category ? .isSelected : []
+                                )
                             }
                         }
                     }
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 14)
+            .padding(.horizontal, presentation == .window ? 10 : 12)
+            .padding(
+                .top,
+                presentation == .window ? SettingsPanelMetrics.windowSidebarTopInset : 14
+            )
+            .padding(.bottom, presentation == .window ? 12 : 14)
         }
+        .padding(presentation == .window ? 0 : 8)
+        .background { sidebarBackground }
+        .overlay(alignment: .trailing) {
+            if presentation == .window {
+                Rectangle()
+                    .fill(Color.white.opacity(0.075))
+                    .frame(width: 1)
+                    .accessibilityHidden(true)
+            } else {
+                sidebarShape.strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+            }
+        }
+        .shadow(
+            color: Color.black.opacity(presentation == .window ? 0 : 0.20),
+            radius: 24,
+            y: 14
+        )
     }
 
     @ViewBuilder
     private var sidebarBackground: some View {
-        switch theme.visual.settingsChromeStyle {
-        case .pingIsland:
-            UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: .continuous
+        if presentation == .window,
+           theme.visual.settingsChromeStyle == .macOS {
+            SettingsGlassSurface(
+                material: .sidebar,
+                blendingMode: .withinWindow,
+                state: .followsWindowActiveState
             )
-                .fill(Color.white.opacity(0.055))
-                .overlay {
-                    SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 24,
-                                bottomLeadingRadius: 24,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 0,
-                                style: .continuous
-                            )
-                        )
-                        .opacity(0.94)
-                }
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.12),
-                            Color.white.opacity(0.04),
-                            Color.black.opacity(0.10)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 24,
-                            bottomLeadingRadius: 24,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 0,
-                            style: .continuous
-                        )
-                    )
-                }
-                .overlay(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color.white.opacity(0.16))
-                        .frame(width: 120, height: 120)
-                        .blur(radius: 36)
-                        .offset(x: 28, y: -26)
-                }
-
-        case .macOS, .pixel:
-            UnevenRoundedRectangle(
-                topLeadingRadius: theme.visual.settingsCornerRadius,
-                bottomLeadingRadius: theme.visual.settingsCornerRadius,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: theme.visual.usesPixelGrid ? .circular : .continuous
-            )
+        } else {
+            sidebarShape
                 .fill(theme.visual.settingsSidebarSurface)
                 .overlay {
                     SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: theme.visual.settingsCornerRadius,
-                                bottomLeadingRadius: theme.visual.settingsCornerRadius,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 0,
-                                style: theme.visual.usesPixelGrid ? .circular : .continuous
-                            )
-                        )
+                        .clipShape(sidebarShape)
                         .opacity(theme.visual.usesGlassMaterial ? 0.94 : 0)
                 }
                 .overlay {
@@ -2966,19 +2881,11 @@ private struct SettingsPanelContentView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: theme.visual.settingsCornerRadius,
-                            bottomLeadingRadius: theme.visual.settingsCornerRadius,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 0,
-                            style: theme.visual.usesPixelGrid ? .circular : .continuous
-                        )
-                    )
+                    .clipShape(sidebarShape)
                 }
                 .overlay(alignment: .topTrailing) {
                     Circle()
-                        .fill(theme.visual.accent.opacity(0.16))
+                        .fill(sidebarAccentGlow)
                         .frame(width: 120, height: 120)
                         .blur(radius: 36)
                         .offset(x: 28, y: -26)
@@ -2986,187 +2893,54 @@ private struct SettingsPanelContentView: View {
         }
     }
 
-    @ViewBuilder
-    private var sidebarBorder: some View {
-        switch theme.visual.settingsChromeStyle {
-        case .pingIsland:
-            UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-
-        case .macOS, .pixel:
-            UnevenRoundedRectangle(
-                topLeadingRadius: theme.visual.settingsCornerRadius,
-                bottomLeadingRadius: theme.visual.settingsCornerRadius,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: theme.visual.usesPixelGrid ? .circular : .continuous
-            )
-                .strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
-        }
-    }
-
-    private var sidebarWindowControls: some View {
-        HStack(spacing: 10) {
-            WindowControlButton(
-                color: Color(red: 1.0, green: 0.37, blue: 0.36),
-                symbol: "xmark"
-            ) {
-                if let onClose {
-                    onClose()
-                } else {
-                    currentWindow?.performClose(nil)
-                }
-            }
-
-            WindowControlButton(
-                color: Color(red: 1.0, green: 0.74, blue: 0.18),
-                symbol: "minus"
-            ) {
-                if let onMinimize {
-                    onMinimize()
-                } else {
-                    currentWindow?.miniaturize(nil)
-                }
-            }
-
-            WindowControlButton(
-                color: Color(red: 0.16, green: 0.78, blue: 0.29),
-                symbol: "arrow.up.left.and.arrow.down.right"
-            ) {
-                currentWindow?.toggleFullScreen(nil)
-            }
-
-            SettingsWindowDragHandle()
-                .frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22)
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 2)
-    }
-
-    private var macOSWindowToolbar: some View {
-        HStack(spacing: 0) {
-            HStack(spacing: 9) {
-                WindowControlButton(
-                    color: Color(red: 1.0, green: 0.37, blue: 0.36),
-                    symbol: "xmark"
-                ) {
-                    if let onClose { onClose() } else { currentWindow?.performClose(nil) }
-                }
-                WindowControlButton(
-                    color: Color(red: 1.0, green: 0.74, blue: 0.18),
-                    symbol: "minus"
-                ) {
-                    if let onMinimize { onMinimize() } else { currentWindow?.miniaturize(nil) }
-                }
-                WindowControlButton(
-                    color: Color(red: 0.16, green: 0.78, blue: 0.29),
-                    symbol: "arrow.up.left.and.arrow.down.right"
-                ) {
-                    currentWindow?.toggleFullScreen(nil)
-                }
-
-                SettingsWindowDragHandle()
-                    .frame(maxWidth: .infinity, minHeight: 28, maxHeight: 28)
-                    .accessibilityHidden(true)
-            }
-            .padding(.leading, 20)
-            .padding(.trailing, 12)
-            .frame(width: sidebarWidth)
-
-            Divider()
-
-            HStack(spacing: 8) {
-                Image(systemName: currentCategory.icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.visual.secondaryText)
-                Text(appLocalized: currentCategory.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(theme.visual.primaryText)
-
-                SettingsWindowDragHandle()
-                    .frame(maxWidth: .infinity, minHeight: 28, maxHeight: 28)
-                    .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 16)
-        }
-        .frame(height: 52)
-        .background {
-            SettingsGlassSurface(material: .headerView, blendingMode: .withinWindow)
-                .opacity(theme.visual.usesGlassMaterial ? 1 : 0)
-            theme.visual.settingsSurface.opacity(0.90)
-        }
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(theme.visual.settingsCardBorder)
-                .frame(height: 1)
-        }
+    private var sidebarAccentGlow: Color {
+        theme.visual.settingsChromeStyle == .pingIsland
+            ? Color.white.opacity(0.16)
+            : theme.visual.accent.opacity(0.16)
     }
 
     @ViewBuilder
     private var detail: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 22) {
-                if loadingCategory == currentCategory {
-                    SettingsCategoryLoadingView(category: currentCategory)
-                } else {
-                    switch currentCategory {
-                    case .general:
-                        generalContent
-                    case .shortcuts:
-                        shortcutsContent
-                    case .display:
-                        displayContent
-                    case .mascot:
-                        mascotContent
-                    case .sound:
-                        soundContent
-                    case .analytics:
-                        analyticsContent
-                    case .integration:
-                        integrationContent
-                    case .remote:
-                        remoteContent
-                    case .labs:
-                        labsContent
-                    case .about:
-                        aboutContent
-                    }
+                switch currentDetailCategory {
+                case .general:
+                    generalContent
+                case .shortcuts:
+                    shortcutsContent
+                case .display:
+                    displayContent
+                case .mascot:
+                    mascotContent
+                case .sound:
+                    soundContent
+                case .analytics:
+                    analyticsContent
+                case .integration:
+                    integrationContent
+                case .remote:
+                    remoteContent
+                case .labs:
+                    labsContent
+                case .about:
+                    aboutContent
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.top, 24)
+            .padding(
+                .top,
+                presentation == .window ? SettingsPanelMetrics.windowDetailTopInset : 24
+            )
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .id(currentCategory)
-        .accessibilityIdentifier("settings.detail.\(currentCategory.rawValue)")
+        .accessibilityIdentifier("settings.detail.\(currentDetailCategory.rawValue)")
         .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: theme.visual.settingsCornerRadius,
-                topTrailingRadius: theme.visual.settingsCornerRadius,
-                style: theme.visual.usesPixelGrid ? .circular : .continuous
-            )
+            detailShape
                 .fill(theme.visual.settingsDetailSurface)
                 .overlay {
                     SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 0,
-                                bottomLeadingRadius: 0,
-                                bottomTrailingRadius: theme.visual.settingsCornerRadius,
-                                topTrailingRadius: theme.visual.settingsCornerRadius,
-                                style: theme.visual.usesPixelGrid ? .circular : .continuous
-                            )
-                        )
+                        .clipShape(detailShape)
                         .opacity(theme.visual.usesGlassMaterial ? 0.96 : 0)
                 }
                 .overlay {
@@ -3179,28 +2953,15 @@ private struct SettingsPanelContentView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 0,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: theme.visual.settingsCornerRadius,
-                            topTrailingRadius: theme.visual.settingsCornerRadius,
-                            style: theme.visual.usesPixelGrid ? .circular : .continuous
-                        )
-                    )
+                    .clipShape(detailShape)
                 }
         )
-        .overlay(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: theme.visual.settingsCornerRadius,
-                topTrailingRadius: theme.visual.settingsCornerRadius,
-                style: theme.visual.usesPixelGrid ? .circular : .continuous
-            )
-                .strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
+        .overlay(detailShape.strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1))
+        .shadow(
+            color: Color.black.opacity(presentation == .window ? 0 : 0.16),
+            radius: 24,
+            y: 14
         )
-        .shadow(color: Color.black.opacity(0.16), radius: 24, y: 14)
     }
 
     private var currentCategory: SettingsCategory {
@@ -3209,6 +2970,13 @@ private struct SettingsPanelContentView: View {
             return .general
         }
         return category
+    }
+
+    private var currentDetailCategory: SettingsCategory {
+        guard displayedCategory != .labs || settings.labsSettingsUnlocked else {
+            return .general
+        }
+        return displayedCategory
     }
 
     private var currentWindow: NSWindow? {
@@ -3229,11 +2997,34 @@ private struct SettingsPanelContentView: View {
             selectedCategory = .labs
         }
 
-        let categoryToRefresh = currentCategory
-        scheduleCategoryRefresh(
-            for: categoryToRefresh,
-            showLoading: shouldShowLoading(for: categoryToRefresh)
-        )
+        presentSelectedCategory(currentCategory)
+    }
+
+    private func presentSelectedCategory(_ category: SettingsCategory) {
+        categoryPresentationTask?.cancel()
+        categoryPresentationTask = nil
+
+        guard currentDetailCategory != category else {
+            scheduleCategoryRefresh(for: category)
+            return
+        }
+
+        categoryPresentationTask = Task { @MainActor in
+            // Preserve one display frame for the sidebar selection before building
+            // a potentially large detail hierarchy.
+            try? await Task.sleep(nanoseconds: 16_000_000)
+            guard !Task.isCancelled else { return }
+
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                displayedCategory = category
+            }
+
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            scheduleCategoryRefresh(for: category)
+        }
     }
 
     private func showAnalyticsConsentPromptIfNeeded() {
@@ -3245,39 +3036,20 @@ private struct SettingsPanelContentView: View {
         showingAnalyticsConsentPrompt = true
     }
 
-    private func shouldShowLoading(for category: SettingsCategory) -> Bool {
-        switch category {
-        case .display, .sound, .integration:
-            return true
-        case .general, .shortcuts, .mascot, .analytics, .remote, .labs, .about:
-            return false
-        }
-    }
-
-    private func scheduleCategoryRefresh(for category: SettingsCategory, showLoading: Bool) {
+    private func scheduleCategoryRefresh(for category: SettingsCategory, force: Bool = false) {
         categoryRefreshTask?.cancel()
         categoryRefreshTask = nil
 
-        if showLoading {
-            loadingCategory = category
-        } else if loadingCategory == category {
-            loadingCategory = nil
+        if category == .analytics {
+            if force {
+                analyticsViewModel.refresh()
+            } else {
+                analyticsViewModel.refreshIfNeeded()
+            }
         }
 
-        categoryRefreshTask = Task { @MainActor in
-            if showLoading {
-                try? await Task.sleep(nanoseconds: 80_000_000)
-            } else {
-                await Task.yield()
-            }
-
-            guard !Task.isCancelled else { return }
-            viewModel.refresh(for: category)
-
-            guard !Task.isCancelled else { return }
-            if loadingCategory == category {
-                loadingCategory = nil
-            }
+        categoryRefreshTask = Task {
+            await viewModel.refresh(for: category, force: force)
         }
     }
 
@@ -3603,7 +3375,7 @@ private struct SettingsPanelContentView: View {
     }
 
     private var analyticsContent: some View {
-        AgentUsageAnalyticsContent()
+        AgentUsageAnalyticsContent(viewModel: analyticsViewModel)
     }
 
     private var integrationContent: some View {
@@ -4250,14 +4022,12 @@ private struct SettingsPanelContentView: View {
 
 struct SettingsWindowView: View {
     var onClose: (() -> Void)? = nil
-    var onMinimize: (() -> Void)? = nil
 
     var body: some View {
         AppLocalizedRootView {
             SettingsPanelContentView(
                 presentation: .window,
-                onClose: onClose,
-                onMinimize: onMinimize
+                onClose: onClose
             )
             .accessibilityIdentifier("settings.root")
         }
@@ -4278,14 +4048,19 @@ private struct SidebarItemView: View {
     let isSelected: Bool
     var showsNoticeDot: Bool = false
     @Environment(\.islandExperienceTheme) private var theme
+    @Environment(\.controlActiveState) private var controlActiveState
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @State private var isHovered = false
 
     @ViewBuilder
     var body: some View {
         switch theme.visual.settingsChromeStyle {
         case .pingIsland:
             pingIslandItem
-        case .macOS, .pixel:
-            themedItem
+        case .macOS:
+            macOSItem
+        case .pixel:
+            pixelItem
         }
     }
 
@@ -4299,19 +4074,10 @@ private struct SidebarItemView: View {
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(
-                                isSelected
-                                ? LinearGradient(
+                                LinearGradient(
                                     colors: [
-                                        category.tint.opacity(0.95),
-                                        category.tint.opacity(0.60)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                                : LinearGradient(
-                                    colors: [
-                                        category.tint.opacity(0.92),
-                                        category.tint.opacity(0.74)
+                                        category.tint.opacity(isSelected ? 0.95 : 0.92),
+                                        category.tint.opacity(isSelected ? 0.60 : 0.74)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -4352,22 +4118,68 @@ private struct SidebarItemView: View {
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
-    private var themedItem: some View {
+    private var macOSItem: some View {
+        HStack(spacing: 9) {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: category.macOSIcon)
+                    .symbolRenderingMode(.monochrome)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(isSelected ? Color.accentColor : theme.visual.secondaryText)
+                    .frame(width: 18, height: 20)
+
+                noticeDot
+            }
+
+            Text(appLocalized: category.title)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                .foregroundColor(theme.visual.primaryText.opacity(isSelected ? 0.94 : 0.76))
+                .lineLimit(1)
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 6)
+        .frame(minHeight: 30)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(macOSRowBackground)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .onHover { isHovered = $0 }
+        .animation(accessibilityReduceMotion ? nil : .easeOut(duration: 0.10), value: isHovered)
+        .animation(accessibilityReduceMotion ? nil : .easeOut(duration: 0.10), value: isSelected)
+    }
+
+    private var macOSRowBackground: Color {
+        if isSelected {
+            switch controlActiveState {
+            case .key:
+                return Color.accentColor.opacity(0.20)
+            case .active:
+                return theme.visual.primaryText.opacity(0.10)
+            case .inactive:
+                return theme.visual.primaryText.opacity(0.065)
+            @unknown default:
+                return theme.visual.primaryText.opacity(0.10)
+            }
+        }
+        return isHovered ? theme.visual.primaryText.opacity(0.055) : .clear
+    }
+
+    private var pixelItem: some View {
         HStack(spacing: 10) {
             ZStack(alignment: .topTrailing) {
                 ExperienceThemeSidebarSymbol(
                     category: category,
-                    color: symbolColor
+                    color: pixelSymbolColor
                 )
                     .frame(width: 24, height: 24)
                     .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(symbolBackground)
+                        RoundedRectangle(cornerRadius: 1, style: .circular)
+                            .fill(isSelected ? theme.visual.accent.opacity(0.28) : theme.visual.previewSurface)
                     )
-                    .clipShape(RoundedRectangle(
-                        cornerRadius: theme.visual.usesPixelGrid ? 1 : 8,
-                        style: theme.visual.usesPixelGrid ? .circular : .continuous
-                    ))
+                    .clipShape(RoundedRectangle(cornerRadius: 1, style: .circular))
 
                 noticeDot
             }
@@ -4390,14 +4202,14 @@ private struct SidebarItemView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(rowBackground)
+            RoundedRectangle(cornerRadius: 1, style: .circular)
+                .fill(isSelected ? theme.visual.accent.opacity(0.20) : .clear)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: 1, style: .circular)
                 .strokeBorder(theme.visual.settingsCardBorder.opacity(isSelected ? 1 : 0.45), lineWidth: 1)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 1, style: .circular))
     }
 
     @ViewBuilder
@@ -4415,65 +4227,16 @@ private struct SidebarItemView: View {
         }
     }
 
-    private var symbolColor: Color {
-        switch theme.visual.settingsChromeStyle {
-        case .macOS:
-            return isSelected ? theme.visual.accent : theme.visual.secondaryText
-        case .pixel:
-            return isSelected ? theme.visual.primaryText : theme.visual.accent
-        case .pingIsland:
-            return Color.white.opacity(isSelected ? 0.95 : 1)
-        }
-    }
-
-    private var symbolBackground: Color {
-        switch theme.visual.settingsChromeStyle {
-        case .macOS:
-            return .clear
-        case .pixel:
-            return isSelected ? theme.visual.accent.opacity(0.28) : theme.visual.previewSurface
-        case .pingIsland:
-            return category.tint.opacity(isSelected ? 0.90 : 0.78)
-        }
-    }
-
-    private var rowBackground: Color {
-        switch theme.visual.settingsChromeStyle {
-        case .macOS:
-            return isSelected ? theme.visual.accent.opacity(0.18) : .clear
-        case .pixel:
-            return isSelected ? theme.visual.accent.opacity(0.20) : .clear
-        case .pingIsland:
-            return isSelected ? .white.opacity(0.12) : Color.white.opacity(0.02)
-        }
+    private var pixelSymbolColor: Color {
+        isSelected ? theme.visual.primaryText : theme.visual.accent
     }
 }
 
-private struct WindowControlButton: View {
-    let color: Color
-    let symbol: String
-    let action: () -> Void
-    @State private var isHovering = false
-
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(color)
-                .frame(width: 12, height: 12)
-                .overlay(
-                    Circle()
-                        .strokeBorder(Color.black.opacity(0.18), lineWidth: 0.5)
-                )
-                .overlay {
-                    if isHovering {
-                        Image(systemName: symbol)
-                            .font(.system(size: 6.5, weight: .black))
-                            .foregroundStyle(Color.black.opacity(0.68))
-                    }
-                }
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
+private struct SettingsSidebarButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .opacity(configuration.isPressed ? 0.72 : 1)
+            .animation(.easeOut(duration: 0.06), value: configuration.isPressed)
     }
 }
 
