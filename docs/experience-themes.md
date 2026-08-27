@@ -23,7 +23,7 @@ Choose a theme from **Settings → Sound → Experience theme**.
 | Theme | Visual language | Recommended audio |
 | --- | --- | --- |
 | **PingIsland native** | Ping Island's dark glass surfaces, rounded controls and existing icon treatment | The original built-in 8-bit mappings, extended to the new semantic moments |
-| **macOS** | Integrated top navigation, native sidebar treatment, SF Symbols, system materials and semantic system colors | macOS system sounds |
+| **macOS** | Native titlebar and traffic lights, a full-height source-list sidebar, outline SF Symbols, system materials and semantic system colors | macOS system sounds |
 | **Pixel** | Silkscreen type, code-rendered pixel icons, square controls and pixel grid surfaces | AgentIsland's game-style 8-bit mappings |
 
 Pixel is one theme family with two selectable palettes:
@@ -38,6 +38,28 @@ new top-level theme or a copy of its sound mapping.
 Selecting a theme applies its recommended sound source and lifecycle mapping.
 Users can still customize the five lifecycle sounds afterwards, or select a
 local CESP/OpenPeon pack. Changing only the Pixel palette does not reset audio.
+
+## Settings window shell and themed content
+
+The Settings window has one shared native AppKit shell for every theme. It owns
+the titled/resizable/full-screen window, unified titlebar, native traffic
+lights, immediate background dragging and content insets. Theme code does not
+draw replacement traffic lights or intercept window dragging.
+
+Inside that shell, each theme owns its sidebar rows and content surfaces:
+
+- **PingIsland native** keeps the project's original colored icon tiles,
+  two-line labels, rounded glass cards and category accents.
+- **macOS** uses the compact source-list treatment: outline SF Symbols,
+  single-line labels, system accent selection and sidebar material extending
+  behind the native traffic lights.
+- **Pixel** uses code-rendered pixel glyphs, one-pixel corners, grid surfaces and
+  its selected classic palette.
+
+Category selection is split into an immediate selection update and deferred
+detail construction. Category-specific refresh work is cancellable and cached,
+so returning to Display, Statistics or Sound does not repeatedly block the
+sidebar response.
 
 ## Semantic feedback moments
 
@@ -92,6 +114,9 @@ PingIsland/UI/Themes/
 
 PingIsland/UI/Components/
 └── ExperienceThemeComponents.swift  semantic buttons, cards and palette picker
+
+PingIsland/UI/Window/
+└── SettingsWindowController.swift    shared native Settings window shell
 ```
 
 `AppLocalizedRootView` resolves the persisted family and Pixel palette, then
@@ -116,11 +141,14 @@ yet. To add a new first-party family:
 3. Register one representative definition in `ExperienceThemeRegistry.all` and
    resolve variants explicitly in `theme(for:pixelPalette:)` (or a generalized
    equivalent if the new family has variants).
-4. Use semantic controls and `AppSoundFeedback.play(_:)`. Do not choose action
+4. Add an explicit `settingsChromeStyle` only when the theme needs a distinct
+   Settings sidebar component. Keep native titlebar and dragging behavior in
+   `SettingsWindowController` instead of reproducing it in the theme.
+5. Use semantic controls and `AppSoundFeedback.play(_:)`. Do not choose action
    colors or concrete sound files in feature views.
-5. If a new feedback moment is needed, add a semantic event and a pure transition
+6. If a new feedback moment is needed, add a semantic event and a pure transition
    evaluator, then supply a cue in every built-in theme.
-6. Add registry, mapping, persistence and transition assertions to the Xcode
+7. Add registry, mapping, persistence and transition assertions to the Xcode
    test target, and update this user-facing table.
 
 To add only a Pixel colorway, add a `PixelThemePaletteID` case and its palette

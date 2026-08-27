@@ -4233,10 +4233,15 @@ private struct SidebarItemView: View {
 }
 
 private struct SettingsSidebarButtonStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .opacity(configuration.isPressed ? 0.72 : 1)
-            .animation(.easeOut(duration: 0.06), value: configuration.isPressed)
+            .animation(
+                accessibilityReduceMotion ? nil : .easeOut(duration: 0.06),
+                value: configuration.isPressed
+            )
     }
 }
 

@@ -148,11 +148,15 @@ final class SettingsWindowControllerTests: XCTestCase {
         controller.dismiss()
     }
 
-    func testSettingsSidebarUsesOutlineSystemSymbols() {
+    func testMacOSSettingsSidebarUsesOutlineSystemSymbolsWithoutChangingPingIslandIcons() {
         for category in SettingsCategory.allCases {
             XCTAssertNotNil(NSImage(systemSymbolName: category.icon, accessibilityDescription: nil))
-            XCTAssertFalse(category.icon.contains("fill"), "\(category) should use an outline symbol")
+            XCTAssertNotNil(NSImage(systemSymbolName: category.macOSIcon, accessibilityDescription: nil))
+            XCTAssertFalse(category.macOSIcon.contains("fill"), "\(category) should use an outline symbol in macOS theme")
         }
+
+        XCTAssertEqual(SettingsCategory.general.icon, "gearshape.fill")
+        XCTAssertEqual(SettingsCategory.general.macOSIcon, "gearshape")
     }
 
     func testSettingsWindowUsesAppLocaleRootView() throws {

@@ -13,6 +13,8 @@ struct IslandExperienceTheme {
     let sound: ExperienceThemeSoundProfile
 }
 
+/// Controls the themed content inside the shared native Settings window shell.
+/// Window buttons, dragging, resizing and full-screen behavior stay in AppKit.
 enum ExperienceThemeSettingsChromeStyle: Equatable {
     case pingIsland
     case macOS

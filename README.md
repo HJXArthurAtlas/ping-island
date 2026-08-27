@@ -214,7 +214,7 @@ Ping Island includes three built-in experience themes under `Settings -> Sound -
 | Theme | What it changes | Recommended audio |
 | --- | --- | --- |
 | **PingIsland native** | The project's dark glass surfaces, rounded controls, and original visual language | Original built-in 8-bit mapping plus new semantic moments |
-| **macOS** | Integrated top navigation, native sidebar treatment, SF Symbols, system materials, and semantic controls | macOS system sounds |
+| **macOS** | Native titlebar and traffic lights, full-height source-list sidebar, outline SF Symbols, system materials, and semantic controls | macOS system sounds |
 | **Pixel** | Silkscreen type, pixel grid surfaces, square controls, and code-rendered pixel icons | AgentIsland game-style 8-bit mapping |
 
 Pixel includes **Arcade Neon** and **Game Boy Olive** palettes. They share one
@@ -226,6 +226,12 @@ confirmation-action appearance, motion timing, lifecycle sound mappings, and
 auxiliary cues. In addition to the five configurable notification stages,
 themes cover launch, new sessions, approvals, waiting reminders, rapid submits,
 and usage warning/recovery edges.
+
+All three themes share the same native Settings window shell, so dragging,
+traffic lights, resizing and full-screen behavior remain consistent. The
+PingIsland, macOS and Pixel families then render distinct sidebar rows, icons,
+surfaces and controls inside that shell. Category selection updates immediately;
+heavier refresh work is deferred, cancellable and cached.
 
 Choosing a theme applies its recommended sound mode. You can then switch to a
 local CESP/OpenPeon sound pack; this changes audio only and does not replace the
