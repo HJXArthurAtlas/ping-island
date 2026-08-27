@@ -29,7 +29,8 @@ Choose a theme from **Settings → Sound → Experience theme**.
 Pixel is one theme family with two selectable palettes:
 
 - **Arcade Neon** — deep arcade navy with high-contrast cyan accents.
-- **Game Boy Olive** — the classic four-step olive handheld palette.
+- **Game Boy Olive** — deep handheld olive surfaces, the classic yellow-green
+  accent, and accessibility-adjusted light foregrounds.
 
 Both palettes share the same components, motion and sound profile. The palette
 is persisted independently, so adding a third Pixel colorway does not require a
@@ -64,7 +65,8 @@ Inside that shell, each theme owns its sidebar rows and content surfaces:
   single-line labels, system accent selection and sidebar material extending
   behind the native traffic lights.
 - **Pixel** uses code-rendered pixel glyphs, one-pixel corners, grid surfaces and
-  its selected classic palette.
+  its selected classic palette. Grid texture belongs to each surface background;
+  it never renders above labels, icons, previews or controls.
 
 Category selection is split into an immediate selection update and deferred
 detail construction. Category-specific refresh work is cancellable and cached,
