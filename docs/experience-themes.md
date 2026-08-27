@@ -35,6 +35,16 @@ Both palettes share the same components, motion and sound profile. The palette
 is persisted independently, so adding a third Pixel colorway does not require a
 new top-level theme or a copy of its sound mapping.
 
+### Visual reference
+
+| PingIsland native | macOS |
+| --- | --- |
+| ![PingIsland native Settings theme](images/experience-themes/settings-ping-island.png) | ![macOS Settings theme](images/experience-themes/settings-macos.png) |
+
+| Pixel — Arcade Neon | Pixel — Game Boy Olive |
+| --- | --- |
+| ![Pixel Arcade Neon Settings theme](images/experience-themes/settings-pixel-arcade.png) | ![Pixel Game Boy Olive Settings theme](images/experience-themes/settings-pixel-game-boy.png) |
+
 Selecting a theme applies its recommended sound source and lifecycle mapping.
 Users can still customize the five lifecycle sounds afterwards, or select a
 local CESP/OpenPeon pack. Changing only the Pixel palette does not reset audio.
