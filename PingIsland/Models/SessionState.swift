@@ -58,6 +58,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
     var codexSubagentDepth: Int?
     var codexSubagentNickname: String?
     var codexSubagentRole: String?
+    var latestTurnId: String?
+    var completionSequence: UInt64
     var linkedParentSessionId: String?
     var linkedSubagentDisplayTitle: String?
     var heuristicSubagentDisplayTitle: String?
@@ -148,6 +150,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
             lastToolName: nil, firstUserMessage: nil, lastUserMessageDate: nil
         ),
         needsClearReconciliation: Bool = false,
+        latestTurnId: String? = nil,
+        completionSequence: UInt64 = 0,
         lastActivity: Date = Date(),
         createdAt: Date = Date()
     ) {
@@ -167,6 +171,8 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.codexSubagentDepth = codexSubagentDepth
         self.codexSubagentNickname = codexSubagentNickname
         self.codexSubagentRole = codexSubagentRole
+        self.latestTurnId = latestTurnId
+        self.completionSequence = completionSequence
         self.linkedParentSessionId = linkedParentSessionId
         self.linkedSubagentDisplayTitle = linkedSubagentDisplayTitle
         self.heuristicSubagentDisplayTitle = heuristicSubagentDisplayTitle

@@ -27,14 +27,14 @@ struct SessionSoundEdgeTracker {
     private struct Snapshot {
         var isProcessing: Bool
         var needsAttention: Bool
-        var isCompleted: Bool
+        var completionKey: SessionCompletionKey?
         var isResourceLimited: Bool
         var errorToolIDs: Set<String>
 
         init(_ session: SessionState) {
             isProcessing = session.phase.contributesToProcessingSoundEdge
             needsAttention = SessionAttentionSoundEvaluator.shouldContributeToAttentionSoundEdge(session)
-            isCompleted = SessionCompletionStateEvaluator.isCompletedReadySession(session)
+            completionKey = SessionCompletionKey.make(for: session)
             isResourceLimited = session.phase == .compacting
             errorToolIDs = session.completedErrorToolIDs
         }
@@ -50,6 +50,7 @@ struct SessionSoundEdgeTracker {
     /// from the list are evicted, oldest first.
     private let retainedSessionLimit: Int
     private var records: [String: Record] = [:]
+    private var playedCompletionKeys = Set<SessionCompletionKey>()
     private var sequence: UInt64 = 0
     private var hasPrimed = false
 
@@ -92,7 +93,8 @@ struct SessionSoundEdgeTracker {
             if current.needsAttention, previous?.needsAttention != true {
                 attentionSessions.append(session)
             }
-            if current.isCompleted, previous?.isCompleted != true {
+            if let completionKey = current.completionKey,
+               !playedCompletionKeys.contains(completionKey) {
                 completedSessions.append(session)
             }
             if current.isProcessing, previous?.isProcessing != true {
@@ -129,6 +131,9 @@ struct SessionSoundEdgeTracker {
                 // Failed tool IDs only ever accumulate on a session; keep the ones
                 // already announced so a rebuilt session cannot replay them.
                 snapshot.errorToolIDs.formUnion(existing.errorToolIDs)
+            }
+            if let completionKey = snapshot.completionKey {
+                playedCompletionKeys.insert(completionKey)
             }
             records[session.stableId] = Record(snapshot: snapshot, lastSeenSequence: sequence)
         }

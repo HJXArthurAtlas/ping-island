@@ -183,7 +183,6 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
     private var isPetDragActive = false
     private var isPetInNotchZone = false
     private var isPetSecondaryClickArmed = false
-    private var soundEdgeTracker = SessionSoundEdgeTracker()
     private var previousCompletionNotificationPhases: [String: SessionPhase] = [:]
     private var completionNotificationQueue: [SessionCompletionNotification] = []
     private var currentEnergyMode: EnergyMode = .quietBackground
@@ -299,7 +298,6 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         window.delegate = self
         bindWindowSizeUpdates()
         primeCompletionNotificationTracking(sessionMonitor.instances)
-        soundEdgeTracker.prime(with: sessionMonitor.instances)
     }
 
     required init?(coder: NSCoder) {
@@ -574,7 +572,6 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         sessionMonitor.instances = sessions
         handleManualAttentionChange()
         handleCompletionNotificationChange(sessions)
-        handleSessionSoundTransitions(sessions)
         reconcileHighlightedSessionState()
     }
 
@@ -636,7 +633,6 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
             .sink { [weak self] instances in
                 self?.handleManualAttentionChange()
                 self?.handleCompletionNotificationChange(instances)
-                self?.handleSessionSoundTransitions(instances)
                 self?.reconcileHighlightedSessionState()
                 self?.reconcileBubbleStateWithAvailableContent()
                 self?.scheduleWindowSizeUpdate()
@@ -1914,39 +1910,6 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         markCompletionNotificationConsumed(session: notification.session, kind: notification.kind)
     }
 
-    private func handleSessionSoundTransitions(_ instances: [SessionState]) {
-        guard let edge = soundEdgeTracker.edge(for: instances) else { return }
-        playEventSoundIfNeeded(edge.event, sessions: edge.sessions)
-    }
-
-    private func playEventSoundIfNeeded(_ event: NotificationEvent, sessions: [SessionState]) {
-        guard AppSettings.soundEnabled else { return }
-
-        Task { [weak self] in
-            guard let self else { return }
-            let shouldPlaySound = await self.shouldPlayNotificationSound(for: sessions)
-            if shouldPlaySound {
-                _ = await MainActor.run {
-                    AppSettings.playSound(for: event)
-                }
-            }
-        }
-    }
-
-    private func shouldPlayNotificationSound(for sessions: [SessionState]) async -> Bool {
-        for session in sessions {
-            guard let pid = session.pid else {
-                return true
-            }
-
-            let isFocused = await TerminalVisibilityDetector.isSessionFocused(sessionPid: pid)
-            if !isFocused {
-                return true
-            }
-        }
-
-        return false
-    }
 }
 
 private extension CGRect {

@@ -16,31 +16,50 @@ final class SessionSoundEdgeTrackerTests: XCTestCase {
     private func session(
         id: String,
         pid: Int? = nil,
+        provider: SessionProvider = .claude,
         phase: SessionPhase = .idle,
         chatItems: [ChatHistoryItem] = [],
         completedErrorToolIDs: Set<String> = [],
-        suppressInAppPromptControls: Bool = false
+        suppressInAppPromptControls: Bool = false,
+        latestTurnId: String? = nil
     ) -> SessionState {
         SessionState(
             sessionId: id,
             cwd: "/tmp/ping-island-workspace",
-            provider: .claude,
-            clientInfo: SessionClientInfo(kind: .claudeCode, name: "Claude Code"),
+            provider: provider,
+            clientInfo: provider == .codex
+                ? SessionClientInfo.codexApp(threadId: id)
+                : SessionClientInfo(kind: .claudeCode, name: "Claude Code"),
             suppressInAppPromptControls: suppressInAppPromptControls,
             pid: pid,
             phase: phase,
             chatItems: chatItems,
             completedErrorToolIDs: completedErrorToolIDs,
+            latestTurnId: latestTurnId,
             lastActivity: reference
         )
     }
 
-    private func completedSession(id: String, pid: Int? = nil) -> SessionState {
+    private func completedSession(
+        id: String,
+        pid: Int? = nil,
+        provider: SessionProvider = .claude,
+        turnId: String? = nil,
+        assistantItemId: String? = nil
+    ) -> SessionState {
         session(
             id: id,
             pid: pid,
-            phase: .waitingForInput,
-            chatItems: [ChatHistoryItem(id: "\(id)-reply", type: .assistant("done"), timestamp: reference)]
+            provider: provider,
+            phase: provider == .codex ? .idle : .waitingForInput,
+            chatItems: [
+                ChatHistoryItem(
+                    id: assistantItemId ?? "\(id)-reply",
+                    type: .assistant("done"),
+                    timestamp: reference
+                )
+            ],
+            latestTurnId: turnId
         )
     }
 
@@ -166,6 +185,81 @@ final class SessionSoundEdgeTrackerTests: XCTestCase {
         XCTAssertEqual(edge?.sessions.map(\.sessionId), ["a"])
 
         XCTAssertNil(tracker.edge(for: [completedSession(id: "a")]))
+    }
+
+    func testSameCodexCompletionTurnReplayedTenTimesOnlyFiresOnce() {
+        var tracker = SessionSoundEdgeTracker()
+        tracker.prime(with: [
+            session(id: "codex", provider: .codex, phase: .processing, latestTurnId: "turn-1")
+        ])
+
+        var completionCount = 0
+        for _ in 0..<10 {
+            let completed = completedSession(
+                id: "codex",
+                provider: .codex,
+                turnId: "turn-1",
+                assistantItemId: "assistant-1"
+            )
+            if tracker.edge(for: [completed])?.event == .taskCompleted {
+                completionCount += 1
+            }
+            _ = tracker.edge(for: [
+                session(id: "codex", provider: .codex, phase: .processing, latestTurnId: "turn-1")
+            ])
+        }
+
+        XCTAssertEqual(completionCount, 1)
+    }
+
+    func testNewCodexTurnCanPlayCompletionAfterPreviousTurnWasConsumed() {
+        var tracker = SessionSoundEdgeTracker()
+        tracker.prime(with: [
+            session(id: "codex", provider: .codex, phase: .processing, latestTurnId: "turn-1")
+        ])
+
+        XCTAssertEqual(
+            tracker.edge(for: [completedSession(
+                id: "codex",
+                provider: .codex,
+                turnId: "turn-1",
+                assistantItemId: "assistant-1"
+            )])?.event,
+            .taskCompleted
+        )
+
+        _ = tracker.edge(for: [
+            session(id: "codex", provider: .codex, phase: .processing, latestTurnId: "turn-2")
+        ])
+
+        XCTAssertEqual(
+            tracker.edge(for: [completedSession(
+                id: "codex",
+                provider: .codex,
+                turnId: "turn-2",
+                assistantItemId: "assistant-2"
+            )])?.event,
+            .taskCompleted
+        )
+    }
+
+    func testSharedTrackerDoesNotReplayCompletionWhenPresentationSurfaceChanges() {
+        var sharedTracker = SessionSoundEdgeTracker()
+        sharedTracker.prime(with: [
+            session(id: "codex", provider: .codex, phase: .processing, latestTurnId: "turn-1")
+        ])
+        let completed = completedSession(
+            id: "codex",
+            provider: .codex,
+            turnId: "turn-1",
+            assistantItemId: "assistant-1"
+        )
+
+        XCTAssertEqual(sharedTracker.edge(for: [completed])?.event, .taskCompleted)
+        XCTAssertNil(
+            sharedTracker.edge(for: [completed]),
+            "The SessionMonitor-owned tracker must outlive docked/floating surface reconstruction"
+        )
     }
 
     func testFailedToolFiresOncePerToolId() {

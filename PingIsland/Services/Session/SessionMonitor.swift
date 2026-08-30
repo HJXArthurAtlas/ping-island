@@ -31,6 +31,7 @@ class SessionMonitor: ObservableObject {
     private let shouldRefreshUsage: Bool
     private var questionDraftCache = SessionQuestionDraftCache()
     private var telemetryPendingAttentionSessionIDs: Set<String> = []
+    private var soundEdgeTracker = SessionSoundEdgeTracker()
 
     init(
         runtimeCoordinator: any RuntimeCoordinating = RuntimeCoordinator.shared,
@@ -824,6 +825,7 @@ class SessionMonitor: ObservableObject {
         let visibleSessions = filteredVisibleSessions(from: allSessions)
         let pendingSessions = visibleSessions.filter { $0.needsAttention }
         recordNewAttentionRequests(in: pendingSessions)
+        handleSessionSoundTransitions(visibleSessions)
         if visibleSessions != instances {
             instances = visibleSessions
         }
@@ -842,6 +844,29 @@ class SessionMonitor: ObservableObject {
                 await TelemetryService.shared.recordAttentionRequested(session)
             }
         }
+    }
+
+    private func handleSessionSoundTransitions(_ sessions: [SessionState]) {
+        guard let edge = soundEdgeTracker.edge(for: sessions) else { return }
+        guard AppSettings.soundEnabled else { return }
+
+        Task {
+            guard await shouldPlayNotificationSound(for: edge.sessions) else { return }
+            AppSettings.playSound(for: edge.event)
+        }
+    }
+
+    /// A notification stays quiet only when every originating session can be
+    /// proven to be focused. Missing process metadata intentionally errs toward
+    /// notifying the user.
+    private func shouldPlayNotificationSound(for sessions: [SessionState]) async -> Bool {
+        for session in sessions {
+            guard let pid = session.pid else { return true }
+            if !(await TerminalVisibilityDetector.isSessionFocused(sessionPid: pid)) {
+                return true
+            }
+        }
+        return false
     }
 
     private func filteredVisibleSessions(from sessions: [SessionState]) -> [SessionState] {

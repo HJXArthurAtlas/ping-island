@@ -46,7 +46,6 @@ struct NotchView: View {
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
-    @State private var soundEdgeTracker = SessionSoundEdgeTracker()
     @State private var previousCompletionNotificationPhases: [String: SessionPhase] = [:]
     @State private var completionNotificationQueue: [SessionCompletionNotification] = []
     @State private var activeCompletionNotification: SessionCompletionNotification?
@@ -411,7 +410,6 @@ struct NotchView: View {
                     instances.contains { $0.needsPromptNotification }
                 )
                 handleProcessingChange()
-                handleSessionSoundTransitions(instances)
                 handleManualAttentionChange(instances)
                 handleCompletedReadyChange(instances)
                 handleCompletionNotificationChange(instances)
@@ -1444,24 +1442,6 @@ struct NotchView: View {
         markCompletionNotificationConsumed(session: notification.session, kind: notification.kind)
     }
 
-    private func handleSessionSoundTransitions(_ instances: [SessionState]) {
-        guard let edge = soundEdgeTracker.edge(for: instances) else { return }
-        playEventSoundIfNeeded(edge.event, sessions: edge.sessions)
-    }
-
-    private func playEventSoundIfNeeded(_ event: NotificationEvent, sessions: [SessionState]) {
-        guard AppSettings.soundEnabled else { return }
-
-        Task {
-            let shouldPlaySound = await shouldPlayNotificationSound(for: sessions)
-            if shouldPlaySound {
-                _ = await MainActor.run {
-                    AppSettings.playSound(for: event)
-                }
-            }
-        }
-    }
-
     private func openSettingsWindow() {
         updateManager.markUpdateSeen()
         SettingsWindowController.shared.present()
@@ -1491,23 +1471,6 @@ struct NotchView: View {
         }
     }
 
-    /// Determine if notification sound should play for the given sessions
-    /// Returns true if ANY session is not actively focused
-    private func shouldPlayNotificationSound(for sessions: [SessionState]) async -> Bool {
-        for session in sessions {
-            guard let pid = session.pid else {
-                // No PID means we can't check focus, assume not focused
-                return true
-            }
-
-            let isFocused = await TerminalVisibilityDetector.isSessionFocused(sessionPid: pid)
-            if !isFocused {
-                return true
-            }
-        }
-
-        return false
-    }
 }
 
 private struct NotchDetachmentHintView: View {

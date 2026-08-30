@@ -309,6 +309,8 @@ actor SessionStore {
                 lastUserMessageDate: nil
             ),
             needsClearReconciliation: existing?.needsClearReconciliation ?? false,
+            latestTurnId: existing?.latestTurnId,
+            completionSequence: existing?.completionSequence ?? 0,
             lastActivity: Date(),
             createdAt: existing?.createdAt ?? handle.createdAt
         )
@@ -478,6 +480,7 @@ actor SessionStore {
             applyHookWorkspace(event.cwd, to: &session)
         }
 
+        let wasCompletedReady = SessionCompletionStateEvaluator.isCompletedReadySession(session)
         let previousLastActivity = session.lastActivity
         if !(event.status == "ended" && session.phase == .ended) {
             session.lastActivity = Date()
@@ -555,6 +558,9 @@ actor SessionStore {
         let newPhase: SessionPhase = shouldPreserveEndedStopForAnsweredQuestion || codeBuddyCLINotificationIntervention != nil
             ? .waitingForInput
             : event.determinePhase()
+        if wasCompletedReady, newPhase == .processing {
+            session.completionSequence &+= 1
+        }
         let intervention = codeBuddyCLINotificationIntervention ?? event.intervention
         let shouldPreserveQwenQuestionIntervention = shouldPreserveQwenQuestionIntervention(
             for: event,
@@ -3685,16 +3691,34 @@ actor SessionStore {
         )
         session.cwd = fallbackCwd
         session.projectName = Self.projectName(for: fallbackCwd, fallback: session.projectName)
-        if let name = snapshot.name, !name.isEmpty {
-            session.sessionName = name
+        let shouldPreserveActivePhase = shouldPreserveActivePhaseDuringApparentIdle(
+            session: session,
+            incomingPhase: snapshotPhase,
+            referenceDate: snapshot.updatedAt,
+            previousLastActivity: existingLastActivity,
+            hasCodexTurnCompletionEvidence: hasCodexTurnCompletionEvidence
+        )
+        let shouldPreserveStaleActivePhase = shouldPreserveActivePhaseFromStaleCodexRefresh(
+            currentPhase: session.phase,
+            incomingPhase: snapshotPhase,
+            currentLastActivity: existingLastActivity,
+            incomingActivityAt: snapshot.updatedAt
+        )
+        let shouldPreserveActiveTurnState = !snapshot.isTurnInterrupted
+            && (shouldPreserveActivePhase || shouldPreserveStaleActivePhase)
+        if !shouldPreserveActiveTurnState {
+            if let name = snapshot.name, !name.isEmpty {
+                session.sessionName = name
+            }
+            if let preview = snapshot.displayResultText, !preview.isEmpty {
+                session.previewText = preview
+            } else if let preview = snapshot.preview, !preview.isEmpty {
+                session.previewText = preview
+            }
+            session.chatItems = snapshot.historyItems
+            session.conversationInfo = snapshot.conversationInfo
+            session.latestTurnId = snapshot.latestTurnId ?? session.latestTurnId
         }
-        if let preview = snapshot.displayResultText, !preview.isEmpty {
-            session.previewText = preview
-        } else if let preview = snapshot.preview, !preview.isEmpty {
-            session.previewText = preview
-        }
-        session.chatItems = snapshot.historyItems
-        session.conversationInfo = snapshot.conversationInfo
         session.codexParentThreadId = snapshot.parentThreadId
         session.codexSubagentDepth = snapshot.subagentDepth
         session.codexSubagentNickname = snapshot.subagentNickname
@@ -3716,20 +3740,9 @@ actor SessionStore {
             }
         } else if snapshot.isTurnInterrupted, snapshotPhase == .idle {
             session.phase = .idle
-        } else if shouldPreserveActivePhaseDuringApparentIdle(
-            session: session,
-            incomingPhase: snapshotPhase,
-            referenceDate: snapshot.updatedAt,
-            previousLastActivity: existingLastActivity,
-            hasCodexTurnCompletionEvidence: hasCodexTurnCompletionEvidence
-        ) {
+        } else if shouldPreserveActivePhase {
             // Keep the fresher active state until a stronger non-idle signal arrives.
-        } else if shouldPreserveActivePhaseFromStaleCodexRefresh(
-            currentPhase: session.phase,
-            incomingPhase: snapshotPhase,
-            currentLastActivity: existingLastActivity,
-            incomingActivityAt: snapshot.updatedAt
-        ) {
+        } else if shouldPreserveStaleActivePhase {
             // Keep the fresher active state until Codex catches up with a newer snapshot.
         } else if case .none = session.intervention {
             session.phase = snapshotPhase
@@ -3751,13 +3764,7 @@ actor SessionStore {
         } else if session.ingress != .hookBridge || (!session.phase.needsAttention && !hasIntervention) {
             session.ingress = .codexAppServer
         }
-        if shouldPreserveActivePhaseDuringApparentIdle(
-            session: session,
-            incomingPhase: snapshotPhase,
-            referenceDate: snapshot.updatedAt,
-            previousLastActivity: existingLastActivity,
-            hasCodexTurnCompletionEvidence: hasCodexTurnCompletionEvidence
-        ) {
+        if shouldPreserveActiveTurnState {
             session.lastActivity = existingLastActivity ?? snapshot.updatedAt
         } else {
             session.lastActivity = mergedLastActivity(
@@ -4540,6 +4547,8 @@ actor SessionStore {
             subagentState: previousSession.subagentState,
             conversationInfo: previousSession.conversationInfo,
             needsClearReconciliation: previousSession.needsClearReconciliation,
+            latestTurnId: previousSession.latestTurnId,
+            completionSequence: previousSession.completionSequence,
             lastActivity: previousSession.lastActivity,
             createdAt: previousSession.createdAt
         )
