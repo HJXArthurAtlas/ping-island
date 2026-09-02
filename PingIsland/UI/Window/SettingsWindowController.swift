@@ -104,9 +104,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
-        window.isOpaque = true
-        window.appearance = NSAppearance(named: .darkAqua)
-        window.backgroundColor = .windowBackgroundColor
+        // The SwiftUI theme owns the full window surface, including the area
+        // behind the native traffic lights. Keep the AppKit shell transparent
+        // so it cannot introduce a fixed titlebar color between themes.
+        window.isOpaque = false
+        window.appearance = nil
+        window.backgroundColor = .clear
         window.hasShadow = true
         window.minSize = minimumContentSize
         window.maxSize = maximumContentSize

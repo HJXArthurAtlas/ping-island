@@ -227,6 +227,10 @@ auxiliary cues. In addition to the five configurable notification stages,
 themes cover launch, new sessions, approvals, waiting reminders, rapid submits,
 and usage warning/recovery edges.
 
+The screen-attached notch remains canonical black across every theme. Theme
+selection changes Settings and theme-aware detached surfaces, but never recolors
+the macOS notch area.
+
 All three themes share the same native Settings window shell, so dragging,
 traffic lights, resizing and full-screen behavior remain consistent. The
 PingIsland, macOS and Pixel families then render distinct sidebar rows, icons,

@@ -49,4 +49,27 @@ final class PingIslandUITests: XCTestCase {
             )
         }
     }
+
+    @MainActor
+    func testSettingsSoundPageShowsAllExperienceThemes() throws {
+        let app = XCUIApplication()
+        app.launchEnvironment["PING_ISLAND_UI_TEST_MODE"] = "1"
+        app.launch()
+
+        let soundButton = app.buttons["settings.sidebar.sound"]
+        XCTAssertTrue(soundButton.waitForExistence(timeout: 5))
+        soundButton.tap()
+
+        for themeID in ["standard", "macOS", "pixel"] {
+            XCTAssertTrue(
+                app.buttons["settings.theme.\(themeID)"].waitForExistence(timeout: 2),
+                "The \(themeID) experience theme card should remain visible"
+            )
+        }
+
+        let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        screenshot.name = "Settings-Sound-Experience-Themes"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
 }

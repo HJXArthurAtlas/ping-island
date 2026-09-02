@@ -15,8 +15,6 @@ enum PixelExperienceTheme {
                 extensionNote: "\(paletteID.displayName)：\(paletteID.description)"
             ),
             visual: ExperienceThemeVisualTokens(
-                islandSurface: palette.background,
-                islandTopSeparator: palette.accent.opacity(0.82),
                 detachedSurface: palette.background,
                 settingsSurface: palette.background,
                 settingsSidebarSurface: palette.sidebar,

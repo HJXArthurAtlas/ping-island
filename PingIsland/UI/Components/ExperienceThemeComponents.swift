@@ -59,43 +59,89 @@ struct ExperienceThemeOptionCard: View {
     var pixelPaletteID: PixelThemePaletteID = .arcadeNeon
     let isSelected: Bool
     let action: () -> Void
+    @Environment(\.islandExperienceTheme) private var activeTheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovered = false
 
-    private var theme: IslandExperienceTheme {
+    private var previewTheme: IslandExperienceTheme {
         ExperienceThemeRegistry.theme(for: themeID, pixelPalette: pixelPaletteID)
     }
 
     var body: some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(appLocalized: theme.metadata.displayName)
-                        .font(theme.visual.font(size: 14, weight: .semibold))
+                    Text(appLocalized: previewTheme.metadata.displayName)
+                        .font(previewTheme.visual.font(size: 14, weight: .semibold))
+                        .foregroundStyle(activeTheme.visual.primaryText)
 
                     Spacer(minLength: 0)
 
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 15, weight: .semibold))
+                    selectionIndicator
                 }
 
-                ExperienceThemePreview(theme: theme)
-                    .environment(\.islandExperienceTheme, theme)
+                ExperienceThemePreview(theme: previewTheme)
+                    .environment(\.islandExperienceTheme, previewTheme)
 
-                Text(appLocalized: theme.metadata.description)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(theme.visual.secondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(appLocalized: previewTheme.metadata.description)
+                    .font(activeTheme.visual.font(size: 11, weight: .medium))
+                    .foregroundStyle(activeTheme.visual.secondaryText)
+                    .lineLimit(3)
+                    .frame(minHeight: 42, alignment: .top)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(13)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .buttonStyle(
             ExperienceThemeOptionCardStyle(
-                theme: theme,
-                isSelected: isSelected
+                activeTheme: activeTheme,
+                previewTheme: previewTheme,
+                isSelected: isSelected,
+                isHovered: isHovered,
+                reduceMotion: reduceMotion
             )
         )
-        .accessibilityLabel("\(theme.metadata.displayName) 体验主题")
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .accessibilityIdentifier("settings.theme.\(themeID.rawValue)")
+        .accessibilityLabel("\(previewTheme.metadata.displayName) 体验主题")
         .accessibilityValue(isSelected ? "已选择" : "未选择")
+    }
+
+    private var selectionIndicator: some View {
+        ZStack {
+            Circle()
+                .fill(
+                    isSelected
+                        ? previewTheme.visual.accent
+                        : activeTheme.visual.primaryText.opacity(0.045)
+                )
+            Circle()
+                .strokeBorder(
+                    isSelected
+                        ? previewTheme.visual.accent
+                        : activeTheme.visual.settingsCardBorder,
+                    lineWidth: 1
+                )
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(selectionForeground)
+            }
+        }
+        .frame(width: 18, height: 18)
+        .animation(
+            reduceMotion ? nil : .easeOut(duration: 0.16),
+            value: isSelected
+        )
+    }
+
+    private var selectionForeground: Color {
+        previewTheme.visual.settingsChromeStyle == .pixel
+            ? previewTheme.visual.settingsSurface
+            : .white
     }
 }
 
@@ -233,30 +279,58 @@ private struct PixelActionGlyph: View {
 }
 
 private struct ExperienceThemeOptionCardStyle: ButtonStyle {
-    let theme: IslandExperienceTheme
+    let activeTheme: IslandExperienceTheme
+    let previewTheme: IslandExperienceTheme
     let isSelected: Bool
+    let isHovered: Bool
+    let reduceMotion: Bool
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(isSelected ? theme.visual.primaryText : theme.visual.primaryText.opacity(0.84))
             .background {
                 RoundedRectangle(
-                    cornerRadius: theme.visual.sectionCornerRadius,
-                    style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
+                    cornerRadius: activeTheme.visual.sectionCornerRadius,
+                    style: activeTheme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
                 )
-                .fill(isSelected ? theme.visual.accent.opacity(0.16) : theme.visual.previewSurface)
+                .fill(activeTheme.visual.previewSurface)
+                .overlay {
+                    RoundedRectangle(
+                        cornerRadius: activeTheme.visual.sectionCornerRadius,
+                        style: activeTheme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
+                    )
+                    .fill(previewTheme.visual.accent.opacity(selectionTintOpacity))
+                }
             }
             .overlay {
                 RoundedRectangle(
-                    cornerRadius: theme.visual.sectionCornerRadius,
-                    style: theme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
+                    cornerRadius: activeTheme.visual.sectionCornerRadius,
+                    style: activeTheme.visual.sectionCornerRadius <= 3 ? .circular : .continuous
                 )
                 .strokeBorder(
-                    isSelected ? theme.visual.accent.opacity(0.88) : theme.visual.settingsCardBorder,
+                    isSelected
+                        ? previewTheme.visual.accent.opacity(0.92)
+                        : activeTheme.visual.settingsCardBorder.opacity(isHovered ? 1 : 0.72),
                     lineWidth: isSelected ? 1.5 : 1
                 )
             }
-            .opacity(configuration.isPressed ? 0.78 : 1)
+            .shadow(
+                color: isSelected ? previewTheme.visual.accent.opacity(0.12) : .clear,
+                radius: 12,
+                y: 5
+            )
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.84 : 1)
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.16),
+                value: isHovered
+            )
+    }
+
+    private var selectionTintOpacity: Double {
+        if isSelected {
+            return activeTheme.visual.usesPixelGrid ? 0.18 : 0.11
+        }
+        return isHovered ? 0.055 : 0
     }
 }
 

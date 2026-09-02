@@ -13,8 +13,6 @@ enum PingIslandExperienceTheme {
             extensionNote: "在不改变原有五个阶段音色的前提下，补充会话、提醒和用量反馈。"
         ),
         visual: ExperienceThemeVisualTokens(
-            islandSurface: .black,
-            islandTopSeparator: .black,
             detachedSurface: .black,
             settingsSurface: .clear,
             settingsSidebarSurface: Color.white.opacity(0.055),

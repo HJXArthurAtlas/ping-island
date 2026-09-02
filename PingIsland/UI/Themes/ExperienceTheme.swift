@@ -28,8 +28,6 @@ struct ExperienceThemeMetadata {
 }
 
 struct ExperienceThemeVisualTokens {
-    let islandSurface: Color
-    let islandTopSeparator: Color
     let detachedSurface: Color
     let settingsSurface: Color
     let settingsSidebarSurface: Color

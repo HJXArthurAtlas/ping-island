@@ -16,6 +16,11 @@ IslandExperienceTheme
 A CESP/OpenPeon sound pack is different: it is an optional **audio-only
 override**. It never changes the selected theme's UI, icons, geometry or motion.
 
+The screen-attached notch is intentionally outside the visual theme boundary.
+It always keeps Ping Island's canonical black surface, icon language and motion,
+so changing a Settings theme cannot recolor the macOS notch area. Detached
+panels and Settings remain theme-aware.
+
 ## Built-in experiences
 
 Choose a theme from **Settings → Sound → Experience theme**.
@@ -54,8 +59,10 @@ local CESP/OpenPeon pack. Changing only the Pixel palette does not reset audio.
 
 The Settings window has one shared native AppKit shell for every theme. It owns
 the titled/resizable/full-screen window, unified titlebar, native traffic
-lights, immediate background dragging and content insets. Theme code does not
-draw replacement traffic lights or intercept window dragging.
+lights, immediate background dragging and content insets. Its backing is
+transparent, so the active theme's sidebar and detail surfaces continue behind
+the traffic lights instead of leaving a fixed-color strip across the top. Theme
+code does not draw replacement traffic lights or intercept window dragging.
 
 Inside that shell, each theme owns its sidebar rows and content surfaces:
 
@@ -72,6 +79,11 @@ Category selection is split into an immediate selection update and deferred
 detail construction. Category-specific refresh work is cancellable and cached,
 so returning to Display, Statistics or Sound does not repeatedly block the
 sidebar response.
+
+`NotchView` does not consume theme surface or motion tokens. It fixes the docked
+notch to black and supplies the canonical PingIsland visual theme to its child
+controls. This boundary is separate from `DetachedIslandPanelView`, which may
+continue to use the selected experience theme.
 
 ## Semantic feedback moments
 
@@ -126,6 +138,9 @@ PingIsland/UI/Themes/
 
 PingIsland/UI/Components/
 └── ExperienceThemeComponents.swift  semantic buttons, cards and palette picker
+
+PingIsland/UI/Views/
+└── NotchView.swift                   fixed black docked-notch visual boundary
 
 PingIsland/UI/Window/
 └── SettingsWindowController.swift    shared native Settings window shell

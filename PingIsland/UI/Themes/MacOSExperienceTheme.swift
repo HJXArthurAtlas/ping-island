@@ -13,8 +13,6 @@ enum MacOSExperienceTheme {
             extensionNote: "界面使用系统材质与层级，反馈使用 macOS 系统音。"
         ),
         visual: ExperienceThemeVisualTokens(
-            islandSurface: .black,
-            islandTopSeparator: Color(nsColor: .separatorColor),
             detachedSurface: Color(nsColor: .windowBackgroundColor),
             settingsSurface: Color(nsColor: .windowBackgroundColor),
             settingsSidebarSurface: Color(nsColor: .underPageBackgroundColor),

@@ -1,3 +1,5 @@
+import AppKit
+import SwiftUI
 import XCTest
 @testable import Ping_Island
 
@@ -37,6 +39,28 @@ final class ExperienceThemeTests: XCTestCase {
         XCTAssertEqual(pixel.visual.controlCornerRadius, 2)
         XCTAssertEqual(pixel.pixelPaletteID, .arcadeNeon)
         XCTAssertEqual(pixel.visual.customFontName, "Silkscreen-Bold")
+    }
+
+    func testDockedNotchKeepsCanonicalBlackStyleAcrossExperienceThemes() throws {
+        let surface = try XCTUnwrap(
+            NSColor(DockedNotchVisualStyle.surfaceColor).usingColorSpace(.deviceRGB)
+        )
+        let separator = try XCTUnwrap(
+            NSColor(DockedNotchVisualStyle.topSeparatorColor).usingColorSpace(.deviceRGB)
+        )
+
+        for color in [surface, separator] {
+            XCTAssertEqual(color.redComponent, 0, accuracy: 0.001)
+            XCTAssertEqual(color.greenComponent, 0, accuracy: 0.001)
+            XCTAssertEqual(color.blueComponent, 0, accuracy: 0.001)
+            XCTAssertEqual(color.alphaComponent, 1, accuracy: 0.001)
+        }
+
+        XCTAssertEqual(DockedNotchVisualStyle.contentTheme.id, .standard)
+        XCTAssertEqual(DockedNotchVisualStyle.openResponse, 0.42)
+        XCTAssertEqual(DockedNotchVisualStyle.openDampingFraction, 0.8)
+        XCTAssertEqual(DockedNotchVisualStyle.closeResponse, 0.45)
+        XCTAssertEqual(DockedNotchVisualStyle.closeDampingFraction, 1.0)
     }
 
     func testThemeSoundProfilesMatchTheirRecommendedModes() {

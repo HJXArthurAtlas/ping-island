@@ -706,17 +706,24 @@ private enum SettingsPanelPresentation {
 private struct SoundSettingsContent: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var soundPacks = SoundPackCatalog.shared
+    @Environment(\.islandExperienceTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
             SettingsSectionCard(title: "体验主题") {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 14) {
                     Text("主题同时定义界面细节、确认操作反馈和推荐的提示音方案。导入主题音效包时，视觉主题会保持不变。")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .font(theme.visual.font(size: 12, weight: .medium))
+                        .foregroundStyle(theme.visual.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    HStack(spacing: 10) {
+                    LazyVGrid(
+                        columns: Array(
+                            repeating: GridItem(.flexible(), spacing: 12),
+                            count: ExperienceThemeID.allCases.count
+                        ),
+                        spacing: 12
+                    ) {
                         ForEach(ExperienceThemeID.allCases) { theme in
                             ExperienceThemeOptionCard(
                                 themeID: theme,
@@ -731,17 +738,18 @@ private struct SoundSettingsContent: View {
                     if settings.experienceThemeID == .pixel {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Pixel 配色")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(.secondary)
+                                .font(theme.visual.font(size: 11, weight: .semibold))
+                                .foregroundStyle(theme.visual.secondaryText)
                             PixelThemePalettePicker(selection: $settings.pixelThemePaletteID)
                         }
                         .transition(.opacity.combined(with: .move(edge: .top)))
                     }
 
                     Text("选择主题会同步其推荐声音方案；之后仍可在下方改为系统音或 CESP 主题包。")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.secondary.opacity(0.82))
+                        .font(theme.visual.font(size: 11, weight: .medium))
+                        .foregroundStyle(theme.visual.secondaryText.opacity(0.78))
                 }
+                .padding(16)
             }
 
             SettingsSectionCard(title: "通知") {
@@ -2461,6 +2469,179 @@ private struct SettingsGlassSurface: NSViewRepresentable {
     }
 }
 
+/// Keeps the native titlebar controls in the same appearance as the active
+/// SwiftUI theme while leaving the titlebar surface itself fully transparent.
+private struct SettingsWindowThemeBridge: NSViewRepresentable {
+    let preferredColorScheme: ColorScheme?
+    let chromeStyle: ExperienceThemeSettingsChromeStyle
+    let usesGlassMaterial: Bool
+    let sidebarSurface: Color
+    let detailSurface: Color
+    let sidebarWidth: CGFloat
+
+    func makeNSView(context: Context) -> SettingsWindowThemeBridgeView {
+        let view = SettingsWindowThemeBridgeView()
+        configure(view)
+        return view
+    }
+
+    func updateNSView(_ nsView: SettingsWindowThemeBridgeView, context: Context) {
+        configure(nsView)
+        nsView.applyThemeToWindow()
+    }
+
+    private func configure(_ view: SettingsWindowThemeBridgeView) {
+        view.preferredColorScheme = preferredColorScheme
+        view.chromeStyle = chromeStyle
+        view.usesGlassMaterial = usesGlassMaterial
+        view.sidebarSurface = NSColor(sidebarSurface)
+        view.detailSurface = NSColor(detailSurface)
+        view.sidebarWidth = sidebarWidth
+    }
+}
+
+private final class SettingsWindowThemeBridgeView: NSView {
+    var preferredColorScheme: ColorScheme?
+    var chromeStyle: ExperienceThemeSettingsChromeStyle = .pingIsland
+    var usesGlassMaterial = true
+    var sidebarSurface = NSColor.clear
+    var detailSurface = NSColor.clear
+    var sidebarWidth: CGFloat = 0
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        applyThemeToWindow()
+    }
+
+    func applyThemeToWindow() {
+        guard let window else { return }
+
+        window.isOpaque = false
+        window.backgroundColor = .clear
+        window.titlebarAppearsTransparent = true
+
+        switch preferredColorScheme {
+        case .dark:
+            window.appearance = NSAppearance(named: .darkAqua)
+        case .light:
+            window.appearance = NSAppearance(named: .aqua)
+        case nil:
+            window.appearance = nil
+        @unknown default:
+            window.appearance = nil
+        }
+
+        installOrUpdateBackdrop(in: window)
+    }
+
+    private func installOrUpdateBackdrop(in window: NSWindow) {
+        guard let frameView = window.contentView?.superview else { return }
+
+        let backdrop: SettingsWindowBackdropView
+        if let existing = frameView.subviews.first(where: { $0.identifier == SettingsWindowBackdropView.identifier })
+            as? SettingsWindowBackdropView {
+            backdrop = existing
+        } else {
+            backdrop = SettingsWindowBackdropView(frame: frameView.bounds)
+            backdrop.identifier = SettingsWindowBackdropView.identifier
+            backdrop.autoresizingMask = [.width, .height]
+            frameView.addSubview(backdrop, positioned: .below, relativeTo: window.contentView)
+        }
+
+        backdrop.frame = frameView.bounds
+        backdrop.configure(
+            chromeStyle: chromeStyle,
+            usesGlassMaterial: usesGlassMaterial,
+            sidebarSurface: sidebarSurface,
+            detailSurface: detailSurface,
+            sidebarWidth: sidebarWidth
+        )
+    }
+}
+
+private final class SettingsWindowBackdropView: NSView {
+    static let identifier = NSUserInterfaceItemIdentifier("settings.window.theme-backdrop")
+
+    private let sidebarMaterial = NSVisualEffectView()
+    private let detailMaterial = NSVisualEffectView()
+    private let sidebarTint = NSView()
+    private let detailTint = NSView()
+    private var sidebarWidth: CGFloat = 0
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+
+        for materialView in [sidebarMaterial, detailMaterial] {
+            materialView.blendingMode = .behindWindow
+            materialView.state = .followsWindowActiveState
+            addSubview(materialView)
+        }
+
+        for tintView in [sidebarTint, detailTint] {
+            tintView.wantsLayer = true
+            addSubview(tintView)
+        }
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+
+        let resolvedSidebarWidth = min(sidebarWidth, bounds.width)
+        let sidebarFrame = NSRect(
+            x: bounds.minX,
+            y: bounds.minY,
+            width: resolvedSidebarWidth,
+            height: bounds.height
+        )
+        let detailFrame = NSRect(
+            x: sidebarFrame.maxX,
+            y: bounds.minY,
+            width: max(0, bounds.width - resolvedSidebarWidth),
+            height: bounds.height
+        )
+
+        sidebarMaterial.frame = sidebarFrame
+        sidebarTint.frame = sidebarFrame
+        detailMaterial.frame = detailFrame
+        detailTint.frame = detailFrame
+    }
+
+    func configure(
+        chromeStyle: ExperienceThemeSettingsChromeStyle,
+        usesGlassMaterial: Bool,
+        sidebarSurface: NSColor,
+        detailSurface: NSColor,
+        sidebarWidth: CGFloat
+    ) {
+        self.sidebarWidth = sidebarWidth
+        sidebarMaterial.isHidden = !usesGlassMaterial
+        detailMaterial.isHidden = !usesGlassMaterial
+
+        switch chromeStyle {
+        case .pingIsland:
+            sidebarMaterial.material = .hudWindow
+            detailMaterial.material = .hudWindow
+        case .macOS:
+            sidebarMaterial.material = .sidebar
+            detailMaterial.material = .contentBackground
+        case .pixel:
+            sidebarMaterial.material = .hudWindow
+            detailMaterial.material = .hudWindow
+        }
+
+        sidebarTint.layer?.backgroundColor = sidebarSurface.cgColor
+        detailTint.layer?.backgroundColor = detailSurface.cgColor
+        needsLayout = true
+    }
+}
+
 private enum SettingsPanelMetrics {
     static let windowSize = AppSettings.defaultSettingsWindowSize
     static let windowMinSize = AppSettings.minimumSettingsWindowSize
@@ -2469,7 +2650,7 @@ private enum SettingsPanelMetrics {
     static let windowSidebarWidth: CGFloat = 236
     static let popoverSidebarWidth: CGFloat = 212
     static let windowSidebarTopInset: CGFloat = 56
-    static let windowDetailTopInset: CGFloat = 56
+    static let windowDetailTopInset: CGFloat = 72
     static let windowContentTopInset: CGFloat = 0
     static let popoverContentTopInset: CGFloat = 0
     static let outerPadding: CGFloat = 0
@@ -2503,6 +2684,11 @@ private struct SettingsPanelContentView: View {
 
     var body: some View {
         ZStack {
+            panelBackground
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+
             HStack(spacing: 0) {
                 sidebar
                     .frame(width: sidebarWidth)
@@ -2524,7 +2710,18 @@ private struct SettingsPanelContentView: View {
                 alignment: .topLeading
             )
         }
-        .background(theme.visual.settingsSurface)
+        .background {
+            if presentation == .window {
+                SettingsWindowThemeBridge(
+                    preferredColorScheme: theme.visual.preferredColorScheme,
+                    chromeStyle: theme.visual.settingsChromeStyle,
+                    usesGlassMaterial: theme.visual.usesGlassMaterial,
+                    sidebarSurface: theme.visual.settingsSidebarSurface,
+                    detailSurface: theme.visual.settingsDetailSurface,
+                    sidebarWidth: sidebarWidth
+                )
+            }
+        }
         .ignoresSafeArea()
         .clipShape(
             RoundedRectangle(
@@ -2827,7 +3024,11 @@ private struct SettingsPanelContentView: View {
             .padding(.bottom, presentation == .window ? 12 : 14)
         }
         .padding(presentation == .window ? 0 : 8)
-        .background { sidebarBackground }
+        .background {
+            if presentation == .popover {
+                sidebarBackground
+            }
+        }
         .overlay(alignment: .trailing) {
             if presentation == .window {
                 Rectangle()
@@ -2888,6 +3089,21 @@ private struct SettingsPanelContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var panelBackground: some View {
+        if presentation == .window {
+            HStack(spacing: 0) {
+                sidebarBackground
+                    .frame(width: sidebarWidth)
+
+                detailBackground
+                    .frame(maxWidth: .infinity)
+            }
+        } else {
+            theme.visual.settingsSurface
+        }
+    }
+
     private var sidebarAccentGlow: Color {
         theme.visual.settingsChromeStyle == .pingIsland
             ? Color.white.opacity(0.16)
@@ -2930,37 +3146,43 @@ private struct SettingsPanelContentView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier("settings.detail.\(currentDetailCategory.rawValue)")
-        .background(
-            detailShape
-                .fill(theme.visual.settingsDetailSurface)
-                .overlay {
-                    ExperienceThemeGridTexture()
-                        .clipShape(detailShape)
-                }
-                .overlay {
-                    SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                        .clipShape(detailShape)
-                        .opacity(theme.visual.usesGlassMaterial ? 0.96 : 0)
-                }
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            theme.visual.primaryText.opacity(0.11),
-                            theme.visual.primaryText.opacity(0.03),
-                            Color.black.opacity(0.05)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(detailShape)
-                }
-        )
+        .background {
+            if presentation == .popover {
+                detailBackground
+            }
+        }
         .overlay(detailShape.strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1))
         .shadow(
             color: Color.black.opacity(presentation == .window ? 0 : 0.16),
             radius: 24,
             y: 14
         )
+    }
+
+    private var detailBackground: some View {
+        detailShape
+            .fill(theme.visual.settingsDetailSurface)
+            .overlay {
+                ExperienceThemeGridTexture()
+                    .clipShape(detailShape)
+            }
+            .overlay {
+                SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
+                    .clipShape(detailShape)
+                    .opacity(theme.visual.usesGlassMaterial ? 0.96 : 0)
+            }
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        theme.visual.primaryText.opacity(0.11),
+                        theme.visual.primaryText.opacity(0.03),
+                        Color.black.opacity(0.05)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .clipShape(detailShape)
+            }
     }
 
     private var currentCategory: SettingsCategory {

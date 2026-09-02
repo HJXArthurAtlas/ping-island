@@ -20,6 +20,22 @@ private let cornerRadiusInsets = (
 private let compactCenterContentInset: CGFloat = 14
 private let minimumClosedNotchFullContentWidth: CGFloat = 96
 
+/// The screen-attached notch is stable product chrome rather than a theme
+/// surface. Settings and detached panels may change theme, while this
+/// presentation keeps the canonical black appearance and motion.
+enum DockedNotchVisualStyle {
+    static let surfaceColor = Color.black
+    static let topSeparatorColor = Color.black
+    static let openResponse: TimeInterval = 0.42
+    static let openDampingFraction: CGFloat = 0.8
+    static let closeResponse: TimeInterval = 0.45
+    static let closeDampingFraction: CGFloat = 1.0
+
+    static var contentTheme: IslandExperienceTheme {
+        PingIslandExperienceTheme.definition
+    }
+}
+
 struct OpenedPanelContentHeightPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
 
@@ -39,7 +55,6 @@ struct NotchView: View {
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
-    @Environment(\.islandExperienceTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var previousPendingIds: Set<String> = []
     @State private var manualAttentionTracker = SessionManualAttentionTracker()
@@ -325,19 +340,19 @@ struct NotchView: View {
         )
     }
 
-    // Theme-owned panel motion. Reduced Motion keeps presentation changes direct.
+    // The docked notch keeps its established motion across experience themes.
     private var openAnimation: Animation {
         .spring(
-            response: theme.motion.panelResponse,
-            dampingFraction: theme.motion.panelDampingFraction,
+            response: DockedNotchVisualStyle.openResponse,
+            dampingFraction: DockedNotchVisualStyle.openDampingFraction,
             blendDuration: 0
         )
     }
 
     private var closeAnimation: Animation {
         .spring(
-            response: theme.motion.panelResponse + 0.03,
-            dampingFraction: min(1, theme.motion.panelDampingFraction + 0.12),
+            response: DockedNotchVisualStyle.closeResponse,
+            dampingFraction: DockedNotchVisualStyle.closeDampingFraction,
             blendDuration: 0
         )
     }
@@ -346,6 +361,7 @@ struct NotchView: View {
 
     var body: some View {
         instrumentedBody
+            .environment(\.islandExperienceTheme, DockedNotchVisualStyle.contentTheme)
     }
 
     private var presentedBody: some View {
@@ -563,17 +579,11 @@ struct NotchView: View {
             .frame(maxWidth: isOpened ? notchSize.width : nil, alignment: .top)
             .padding(.horizontal, horizontalInset)
             .padding([.horizontal, .bottom], isOpened ? 12 : 0)
-            .background {
-                theme.visual.islandSurface
-                    .overlay {
-                        ExperienceThemeGridTexture()
-                            .clipShape(currentNotchShape)
-                    }
-            }
+            .background(DockedNotchVisualStyle.surfaceColor)
             .clipShape(currentNotchShape)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(theme.visual.islandTopSeparator)
+                    .fill(DockedNotchVisualStyle.topSeparatorColor)
                     .frame(height: 1)
                     .padding(.horizontal, topCornerRadius)
             }
