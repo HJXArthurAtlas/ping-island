@@ -10,8 +10,8 @@ struct DetachedIslandPetMetrics: Equatable {
     let badgeOffset: CGSize
     let floatingUsageBoltVerticalOffset: CGFloat
 
-    static let minimumScale: CGFloat = 1
-    static let maximumScale: CGFloat = 1.75
+    static let minimumScale = CGFloat(AppSettingsStore.minimumFloatingPetScale)
+    static let maximumScale = CGFloat(AppSettingsStore.maximumFloatingPetScale)
     static let standard = DetachedIslandPetMetrics(scale: minimumScale)
 
     init(scale: CGFloat) {
@@ -51,39 +51,12 @@ enum DetachedIslandPanelMetrics {
     static let completionBubbleFallbackHeight: CGFloat = 180
 
     @MainActor
-    static func petMetrics(for screenRect: CGRect) -> DetachedIslandPetMetrics {
-        petMetrics(for: screenRect, sizeMode: AppSettings.floatingPetSizeMode)
+    static func petMetrics() -> DetachedIslandPetMetrics {
+        petMetrics(scale: AppSettings.floatingPetScale)
     }
 
-    static func petMetrics(
-        for screenRect: CGRect,
-        sizeMode: FloatingPetSizeMode
-    ) -> DetachedIslandPetMetrics {
-        DetachedIslandPetMetrics(scale: resolutionScale(for: screenRect, sizeMode: sizeMode))
-    }
-
-    static func resolutionScale(
-        for screenRect: CGRect,
-        sizeMode: FloatingPetSizeMode
-    ) -> CGFloat {
-        switch sizeMode {
-        case .standard:
-            return 1
-        case .automatic:
-            return automaticResolutionScale(for: screenRect)
-        case .large:
-            return max(1.16, automaticResolutionScale(for: screenRect))
-        case .extraLarge:
-            return DetachedIslandPetMetrics.maximumScale
-        }
-    }
-
-    private static func automaticResolutionScale(for screenRect: CGRect) -> CGFloat {
-        let baseArea: CGFloat = 1440 * 900
-        let area = max(screenRect.width * screenRect.height, baseArea)
-        let linearScale = sqrt(area / baseArea)
-
-        return min(1.22, 1 + ((linearScale - 1) * 0.45))
+    static func petMetrics(scale: Double) -> DetachedIslandPetMetrics {
+        DetachedIslandPetMetrics(scale: CGFloat(scale))
     }
 }
 
@@ -341,7 +314,7 @@ enum DetachedIslandContentModel {
         petScreenAnchor: CGPoint? = nil,
         availableFrame: CGRect? = nil
     ) -> DetachedIslandWindowLayout {
-        let petMetrics = DetachedIslandPanelMetrics.petMetrics(for: viewModel.screenRect)
+        let petMetrics = DetachedIslandPanelMetrics.petMetrics()
         let petSize = CGSize(
             width: petMetrics.petHitFrame,
             height: petMetrics.petHitFrame
@@ -703,7 +676,7 @@ struct DetachedIslandPanelView: View {
     }
 
     private var petMetrics: DetachedIslandPetMetrics {
-        DetachedIslandPanelMetrics.petMetrics(for: viewModel.screenRect)
+        DetachedIslandPanelMetrics.petMetrics()
     }
 
     private var usageSummaryProviders: [UsageSummaryProvider] {

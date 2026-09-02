@@ -400,20 +400,50 @@ final class AppSettingsPersistenceTests: XCTestCase {
         XCTAssertEqual(defaults.string(forKey: AppSettingsDefaultKeys.surfaceMode), IslandSurfaceMode.floatingPet.rawValue)
     }
 
-    func testFloatingPetSizeModePersists() {
+    func testFloatingPetScalePersistsAndClampsToSupportedRange() {
         let defaults = makeDefaults()
         let store = makeStore(defaults: defaults)
 
-        XCTAssertEqual(store.floatingPetSizeMode, .automatic)
+        XCTAssertEqual(store.floatingPetScale, 1, accuracy: 0.001)
 
-        store.floatingPetSizeMode = .extraLarge
+        store.floatingPetScale = 1.35
 
         let reloadedStore = makeStore(defaults: defaults)
-        XCTAssertEqual(reloadedStore.floatingPetSizeMode, .extraLarge)
+        XCTAssertEqual(reloadedStore.floatingPetScale, 1.35, accuracy: 0.001)
         XCTAssertEqual(
-            defaults.string(forKey: AppSettingsDefaultKeys.floatingPetSizeMode),
-            FloatingPetSizeMode.extraLarge.rawValue
+            defaults.double(forKey: AppSettingsDefaultKeys.floatingPetScale),
+            1.35,
+            accuracy: 0.001
         )
+
+        store.floatingPetScale = 0.5
+        XCTAssertEqual(store.floatingPetScale, 1, accuracy: 0.001)
+
+        store.floatingPetScale = 2
+        XCTAssertEqual(store.floatingPetScale, 1.75, accuracy: 0.001)
+    }
+
+    func testLegacyFloatingPetSizeModesMigrateToCustomScale() {
+        let expectedScales: [String: Double] = [
+            "automatic": 1,
+            "standard": 1,
+            "large": 1.16,
+            "extraLarge": 1.75
+        ]
+
+        for (legacyMode, expectedScale) in expectedScales {
+            let defaults = makeDefaults(testName: "\(#function).\(legacyMode)")
+            defaults.set(legacyMode, forKey: AppSettingsDefaultKeys.legacyFloatingPetSizeMode)
+
+            let store = makeStore(defaults: defaults)
+
+            XCTAssertEqual(store.floatingPetScale, expectedScale, accuracy: 0.001)
+            XCTAssertEqual(
+                defaults.double(forKey: AppSettingsDefaultKeys.floatingPetScale),
+                expectedScale,
+                accuracy: 0.001
+            )
+        }
     }
 
     func testPreviewMascotKindPersists() {

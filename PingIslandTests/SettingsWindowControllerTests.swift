@@ -19,7 +19,6 @@ final class SettingsWindowControllerTests: XCTestCase {
         keys.append(contentsOf: SettingsCategory.allCases.flatMap { [$0.title, $0.subtitle] })
         keys.append(contentsOf: UsageValueMode.allCases.map(\.title))
         keys.append(contentsOf: AutoRoutePromptsIdleDelay.allCases.map(\.title))
-        keys.append(contentsOf: FloatingPetSizeMode.allCases.flatMap { [$0.title, $0.subtitle] })
         keys.append(contentsOf: SubagentVisibilityMode.allCases.flatMap { [$0.title, $0.subtitle] })
         keys.append(contentsOf: NotchPetStyle.allCases.flatMap { [$0.title, $0.subtitle] })
         keys.append(contentsOf: MascotClient.allCases.flatMap { [$0.title, $0.subtitle] })

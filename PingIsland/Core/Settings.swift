@@ -13,7 +13,8 @@ enum AppSettingsDefaultKeys {
     nonisolated static let surfaceMode = "surfaceMode"
     nonisolated static let notchModuleWidth = "notchModuleWidth"
     nonisolated static let floatingPetAnchor = "floatingPetAnchor"
-    nonisolated static let floatingPetSizeMode = "floatingPetSizeMode"
+    nonisolated static let floatingPetScale = "floatingPetScale"
+    nonisolated static let legacyFloatingPetSizeMode = "floatingPetSizeMode"
     nonisolated static let presentationModeOnboardingPending = "presentationModeOnboardingPending"
     nonisolated static let notchDetachmentHintPending = "notchDetachmentHintPending"
     nonisolated static let floatingPetSettingsHintPending = "floatingPetSettingsHintPending"
@@ -253,37 +254,20 @@ struct FloatingPetAnchor: Codable, Equatable {
     let yRatio: Double
 }
 
-enum FloatingPetSizeMode: String, CaseIterable, Identifiable {
+private enum LegacyFloatingPetSizeMode: String {
     case automatic
     case standard
     case large
     case extraLarge
 
-    var id: String { rawValue }
-
-    var title: String {
+    var scale: Double {
         switch self {
-        case .automatic:
-            return "自动"
-        case .standard:
-            return "标准"
+        case .automatic, .standard:
+            return AppSettingsStore.defaultFloatingPetScale
         case .large:
-            return "较大"
+            return 1.16
         case .extraLarge:
-            return "超大"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .automatic:
-            return "按显示器分辨率调整，高分屏会更醒目"
-        case .standard:
-            return "固定为旧版悬浮宠物尺寸"
-        case .large:
-            return "在所有显示器上放大宠物形象"
-        case .extraLarge:
-            return "固定为 1.75 倍，明显放大宠物形象"
+            return AppSettingsStore.maximumFloatingPetScale
         }
     }
 }
@@ -395,6 +379,9 @@ final class AppSettingsStore: ObservableObject {
     nonisolated static let defaultNotchModuleWidth: Double = 266
     nonisolated static let minimumNotchModuleWidth: Double = 64
     nonisolated static let maximumNotchModuleWidth: Double = 420
+    nonisolated static let defaultFloatingPetScale: Double = 1
+    nonisolated static let minimumFloatingPetScale: Double = 1
+    nonisolated static let maximumFloatingPetScale: Double = 1.75
 
     private let defaults: UserDefaults
     private let bridgeRuntimeConfigWriter: (BridgeRuntimeConfigSnapshot) -> Void
@@ -449,7 +436,8 @@ final class AppSettingsStore: ObservableObject {
         static let previewMascotKind = "previewMascotKind"
         static let surfaceMode = AppSettingsDefaultKeys.surfaceMode
         static let floatingPetAnchor = AppSettingsDefaultKeys.floatingPetAnchor
-        static let floatingPetSizeMode = AppSettingsDefaultKeys.floatingPetSizeMode
+        static let floatingPetScale = AppSettingsDefaultKeys.floatingPetScale
+        static let legacyFloatingPetSizeMode = AppSettingsDefaultKeys.legacyFloatingPetSizeMode
         static let presentationModeOnboardingPending = AppSettingsDefaultKeys.presentationModeOnboardingPending
         static let notchDetachmentHintPending = AppSettingsDefaultKeys.notchDetachmentHintPending
         static let floatingPetSettingsHintPending = AppSettingsDefaultKeys.floatingPetSettingsHintPending
@@ -890,10 +878,15 @@ final class AppSettingsStore: ObservableObject {
         }
     }
 
-    @Published var floatingPetSizeMode: FloatingPetSizeMode {
+    @Published var floatingPetScale: Double {
         didSet {
+            let clamped = Self.normalizedFloatingPetScale(floatingPetScale)
+            if floatingPetScale != clamped {
+                floatingPetScale = clamped
+                return
+            }
             guard !isBootstrapping else { return }
-            defaults.set(floatingPetSizeMode.rawValue, forKey: Keys.floatingPetSizeMode)
+            defaults.set(floatingPetScale, forKey: Keys.floatingPetScale)
         }
     }
 
@@ -1333,6 +1326,10 @@ final class AppSettingsStore: ObservableObject {
         min(max(width, minimumNotchModuleWidth), maximumNotchModuleWidth)
     }
 
+    nonisolated static func normalizedFloatingPetScale(_ scale: Double) -> Double {
+        min(max(scale, minimumFloatingPetScale), maximumFloatingPetScale)
+    }
+
     private func applyIsland8BitStartSoundMigrationIfNeeded(for mode: SoundThemeMode) {
         guard mode == .island8Bit else { return }
         guard !containsPersistedValue(forKey: Keys.island8BitStartSoundMigrated) else { return }
@@ -1383,7 +1380,15 @@ final class AppSettingsStore: ObservableObject {
         let previewMascotKindRaw = defaults.string(forKey: Keys.previewMascotKind)
         let surfaceModeRaw = defaults.string(forKey: Keys.surfaceMode)
         let floatingPetAnchor = Self.decodeValue(FloatingPetAnchor.self, from: defaults, key: Keys.floatingPetAnchor)
-        let floatingPetSizeModeRaw = defaults.string(forKey: Keys.floatingPetSizeMode)
+        let legacyFloatingPetSizeMode = LegacyFloatingPetSizeMode(
+            rawValue: defaults.string(forKey: Keys.legacyFloatingPetSizeMode) ?? ""
+        )
+        let floatingPetScale = Self.normalizedFloatingPetScale(Self.doubleValue(
+            from: defaults,
+            key: Keys.floatingPetScale,
+            exists: persistedKeys.contains(Keys.floatingPetScale),
+            default: legacyFloatingPetSizeMode?.scale ?? Self.defaultFloatingPetScale
+        ))
         let mascotOverrideRaw = Self.mascotOverrides(from: defaults, key: Keys.mascotOverrides)
         let openActiveSessionShortcut = Self.resolvedShortcut(
             from: defaults,
@@ -1565,9 +1570,7 @@ final class AppSettingsStore: ObservableObject {
         _previewMascotKind = Published(initialValue: MascotKind(rawValue: previewMascotKindRaw ?? "") ?? .claude)
         _surfaceMode = Published(initialValue: IslandSurfaceMode(rawValue: surfaceModeRaw ?? "") ?? .notch)
         _floatingPetAnchor = Published(initialValue: floatingPetAnchor)
-        _floatingPetSizeMode = Published(
-            initialValue: FloatingPetSizeMode(rawValue: floatingPetSizeModeRaw ?? "") ?? .automatic
-        )
+        _floatingPetScale = Published(initialValue: floatingPetScale)
         _presentationModeOnboardingPending = Published(initialValue: Self.boolValue(
             from: defaults,
             key: Keys.presentationModeOnboardingPending,
@@ -1667,6 +1670,9 @@ final class AppSettingsStore: ObservableObject {
         if defaults.string(forKey: Keys.pixelThemePaletteID) == nil {
             defaults.set(resolvedPixelThemePaletteID.rawValue, forKey: Keys.pixelThemePaletteID)
         }
+        if !persistedKeys.contains(Keys.floatingPetScale) {
+            defaults.set(floatingPetScale, forKey: Keys.floatingPetScale)
+        }
         if activeTemporaryMute == nil {
             defaults.removeObject(forKey: Keys.temporarilyMuteNotificationsUntil)
         }
@@ -1714,6 +1720,8 @@ enum AppSettings {
     nonisolated static let maximumSettingsWindowSize = CGSize(width: 1440, height: 1100)
     nonisolated static let notchModuleWidthRange =
         AppSettingsStore.minimumNotchModuleWidth...AppSettingsStore.maximumNotchModuleWidth
+    nonisolated static let floatingPetScaleRange =
+        AppSettingsStore.minimumFloatingPetScale...AppSettingsStore.maximumFloatingPetScale
 
     static var notificationSound: NotificationSound {
         get { shared.notificationSound }
@@ -1870,9 +1878,9 @@ enum AppSettings {
         set { shared.floatingPetAnchor = newValue }
     }
 
-    static var floatingPetSizeMode: FloatingPetSizeMode {
-        get { shared.floatingPetSizeMode }
-        set { shared.floatingPetSizeMode = newValue }
+    static var floatingPetScale: Double {
+        get { shared.floatingPetScale }
+        set { shared.floatingPetScale = newValue }
     }
 
     static var presentationModeOnboardingPending: Bool {

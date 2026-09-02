@@ -3428,12 +3428,14 @@ private struct SettingsPanelContentView: View {
                     SettingsLineDivider()
                     FloatingPetPlacementInfoCard()
                     SettingsLineDivider()
-                    SettingsInfoLine(
+                    SettingsSliderLine(
                         title: "宠物大小",
-                        subtitle: "自动模式会根据当前显示器分辨率调整；也可以固定为标准、较大或超大尺寸。"
-                    ) {
-                        FloatingPetSizeModePicker(mode: $settings.floatingPetSizeMode)
-                    }
+                        subtitle: "按倍率调整独立悬浮宠物尺寸，最大可放大至 1.75 倍。",
+                        value: $settings.floatingPetScale,
+                        range: AppSettings.floatingPetScaleRange,
+                        step: 0.05,
+                        format: { "\($0.formatted(.number.precision(.fractionLength(2))))×" }
+                    )
                 }
                 SettingsLineDivider()
 
@@ -6656,22 +6658,6 @@ private struct ClosedNotchTrailingContentPicker: View {
     }
 }
 
-private struct FloatingPetSizeModePicker: View {
-    @Binding var mode: FloatingPetSizeMode
-
-    var body: some View {
-        Picker("", selection: $mode) {
-            ForEach(FloatingPetSizeMode.allCases) { candidate in
-                Text(appLocalized: candidate.title).tag(candidate)
-            }
-        }
-        .labelsHidden()
-        .accessibilityLabel(Text(appLocalized: "宠物大小"))
-        .settingsMenuPicker(width: 132)
-        .help(AppLocalization.string(mode.subtitle))
-    }
-}
-
 struct IslandSurfaceModeSelector: View {
     @Binding var mode: IslandSurfaceMode
     var title: String? = "展示模式"
@@ -6729,7 +6715,7 @@ struct IslandSurfaceModeCard: View {
                             IslandSurfaceModePreviewScene(
                                 surfaceMode: mode,
                                 notchDisplayMode: settings.notchDisplayMode,
-                                floatingPetSizeMode: settings.floatingPetSizeMode
+                                floatingPetScale: settings.floatingPetScale
                             )
                             .padding(12)
                         }
@@ -6810,7 +6796,7 @@ struct IslandSurfaceModeCard: View {
 private struct IslandSurfaceModePreviewScene: View {
     let surfaceMode: IslandSurfaceMode
     let notchDisplayMode: NotchDisplayMode
-    let floatingPetSizeMode: FloatingPetSizeMode
+    let floatingPetScale: Double
     @ObservedObject private var settings = AppSettings.shared
     @State private var isHovered = false
 
@@ -6906,16 +6892,7 @@ private struct IslandSurfaceModePreviewScene: View {
     }
 
     private var previewScale: CGFloat {
-        switch floatingPetSizeMode {
-        case .automatic:
-            return 1.08
-        case .standard:
-            return 1
-        case .large:
-            return 1.16
-        case .extraLarge:
-            return DetachedIslandPetMetrics.maximumScale
-        }
+        CGFloat(floatingPetScale)
     }
 }
 
