@@ -755,10 +755,10 @@ public enum HookPayloadMapper {
             return ("Qoder CN", "com.aliyun.lingma.ide")
         }
         if bundleIdentifier == "com.qoder.ide"
-            || hints.contains("qoder.app")
+            || hints.contains("qoder ide.app")
             || hints.contains("com.qoder.ide")
             || environment.keys.contains(where: { $0.hasPrefix("QODER_") }) {
-            return ("Qoder", "com.qoder.ide")
+            return ("Qoder IDE", "com.qoder.ide")
         }
         if hints.contains("cursor") || environment.keys.contains(where: { $0.hasPrefix("CURSOR_") }) {
             return ("Cursor", "com.todesktop.230313mzl4w4u92")
@@ -1451,7 +1451,7 @@ public enum HookPayloadMapper {
             return false
         }
 
-        // Process discovery can still find Qoder.app while qodercli is running
+        // Process discovery can still find Qoder IDE.app while qodercli is running
         // in a standalone terminal. The explicit CLI profile must keep its
         // lifecycle events in that case so sessions and notifications remain
         // visible.

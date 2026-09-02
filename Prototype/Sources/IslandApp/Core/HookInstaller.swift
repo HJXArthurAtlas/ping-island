@@ -293,9 +293,9 @@ struct HookInstaller {
         try installQoderCompatibleAssets(
             relativePath: ".qoder/settings.json",
             clientKind: "qoder",
-            clientName: "Qoder",
+            clientName: "Qoder IDE",
             clientOrigin: nil,
-            clientOriginator: "Qoder",
+            clientOriginator: "Qoder IDE",
             preToolUseTimeout: nil
         )
     }

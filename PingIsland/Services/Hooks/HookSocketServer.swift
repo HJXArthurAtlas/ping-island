@@ -881,7 +881,7 @@ private extension BridgeEnvelope {
         switch explicitClientBundleIdentifier {
         case "com.qoder.ide":
             effectiveExplicitKind = "qoder"
-            effectiveExplicitName = "Qoder"
+            effectiveExplicitName = "Qoder IDE"
         case "com.aliyun.lingma.ide":
             effectiveExplicitKind = "qoder-cn"
             effectiveExplicitName = "Qoder CN"

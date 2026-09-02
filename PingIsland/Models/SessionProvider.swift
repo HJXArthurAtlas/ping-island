@@ -770,7 +770,6 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
             normalized.name = "Qoder CN"
         } else if isQoderIDEHosted {
             normalized.profileID = "qoder"
-            normalized.name = "Qoder"
         } else if isQoderCNCLI || (isTerminalHosted && isQoderCNClient) {
             normalized.profileID = "qoder-cn-cli"
             normalized.name = "Qoder CN CLI"
@@ -783,7 +782,14 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
             normalized.name = "Qoder CLI"
         } else if normalized.profileID == nil, normalized.name == nil {
             normalized.profileID = "qoder"
-            normalized.name = "Qoder"
+        }
+
+        if normalized.profileID?.lowercased() == "qoder" {
+            normalized.name = "Qoder IDE"
+            if let launchURL = normalized.launchURL,
+               launchURL.lowercased().hasPrefix("qoder://") {
+                normalized.launchURL = "qoder-ide://" + String(launchURL.dropFirst("qoder://".count))
+            }
         }
 
         return normalized
@@ -948,14 +954,14 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         case "com.qoder.work":
             return workspacePath.flatMap { workspaceURL(scheme: "qoder-work", path: $0) }
         case "com.qoder.ide":
-            return workspacePath.flatMap { workspaceURL(scheme: "qoder", path: $0) }
+            return workspacePath.flatMap { workspaceURL(scheme: "qoder-ide", path: $0) }
         case "com.aliyun.lingma.ide":
             return workspacePath.flatMap { workspaceURL(scheme: "qoder-cn", path: $0) }
         case "com.workbuddy.workbuddy":
             return workspacePath.flatMap { workspaceURL(scheme: "workbuddy", path: $0) }
         default:
             if normalizedBundleIdentifier.contains("qoder") {
-                return workspacePath.flatMap { workspaceURL(scheme: "qoder", path: $0) }
+                return workspacePath.flatMap { workspaceURL(scheme: "qoder-ide", path: $0) }
             }
             if normalizedBundleIdentifier.contains("trae") {
                 return workspacePath.flatMap { workspaceURL(scheme: "trae", path: $0) }

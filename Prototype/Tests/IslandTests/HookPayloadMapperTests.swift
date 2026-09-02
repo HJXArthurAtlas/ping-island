@@ -512,11 +512,11 @@ func mapsQoderIDEContextAheadOfGenericVSCodeDetection() throws {
 
     let envelope = HookPayloadMapper.makeEnvelope(
         source: .claude,
-        arguments: ["island-bridge", "--source", "claude", "--client-kind", "qoder", "--client-name", "Qoder", "--client-originator", "Qoder"],
+        arguments: ["island-bridge", "--source", "claude", "--client-kind", "qoder", "--client-name", "Qoder IDE", "--client-originator", "Qoder IDE"],
         environment: [
             "TERM_PROGRAM": "vscode",
             "__CFBundleIdentifier": "com.qoder.ide",
-            "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder.app/Contents/Resources/app/out/vs/workbench",
+            "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder IDE.app/Contents/Resources/app/out/vs/workbench",
             "PWD": "/tmp/demo"
         ],
         stdinData: payload
@@ -524,9 +524,9 @@ func mapsQoderIDEContextAheadOfGenericVSCodeDetection() throws {
 
     #expect(envelope.terminalContext.terminalProgram == "vscode")
     #expect(envelope.terminalContext.terminalBundleID == "com.qoder.ide")
-    #expect(envelope.terminalContext.ideName == "Qoder")
+    #expect(envelope.terminalContext.ideName == "Qoder IDE")
     #expect(envelope.terminalContext.ideBundleID == "com.qoder.ide")
-    #expect(envelope.metadata["client_originator"] == "Qoder")
+    #expect(envelope.metadata["client_originator"] == "Qoder IDE")
     #expect(envelope.metadata["terminal_bundle_id"] == "com.qoder.ide")
 }
 
@@ -1358,7 +1358,7 @@ func qoderCLIHooksExecutedInsideQoderIDEStayNotifyOnly() throws {
         environment: [
             "TERM_PROGRAM": "vscode",
             "__CFBundleIdentifier": "com.qoder.ide",
-            "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder.app/Contents/Resources/app/out/vs/workbench",
+            "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder IDE.app/Contents/Resources/app/out/vs/workbench",
             "PWD": "/tmp/demo"
         ],
         stdinData: payload
@@ -1385,7 +1385,7 @@ func qoderCLIProcessKeepsLifecycleEventsWhenQoderIDEIsAlsoRunning() throws {
     let environment = [
         "TERM_PROGRAM": "iTerm.app",
         "__CFBundleIdentifier": "com.googlecode.iterm2",
-        "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder.app/Contents/Resources/app/out/vs/workbench",
+        "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder IDE.app/Contents/Resources/app/out/vs/workbench",
         "PWD": "/tmp/demo"
     ]
 
@@ -1534,7 +1534,7 @@ func claudeHooksExecutedInsideQoderIDETerminalKeepClaudeApprovalOptions() throws
         environment: [
             "TERM_PROGRAM": "vscode",
             "__CFBundleIdentifier": "com.qoder.ide",
-            "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder.app/Contents/Resources/app/out/vs/workbench",
+            "VSCODE_GIT_IPC_HANDLE": "/Applications/Qoder IDE.app/Contents/Resources/app/out/vs/workbench",
             "PWD": "/tmp/demo"
         ],
         stdinData: payload

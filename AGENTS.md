@@ -72,7 +72,7 @@ This file is a routing layer for coding agents working in this repo. Keep it sho
 - `PingIsland/Services/Remote`: remote endpoint persistence, SSH bootstrap / attach, and remote hook forwarding
   - Remote bootstrap currently covers JSON hook configs, managed hook directories, and managed plugin directories (for example remote Hermes installs under `~/.hermes/plugins/ping_island`)
 - `PingIsland/Services/Update`: Sparkle updater bridge, appcast/release-notes loading, update state publishing
-- `PingIsland/Services/Window/IDEExtensionInstaller.swift`: installs the VS Code-compatible terminal-focus extension used by Cursor / VS Code / CodeBuddy / Qoder / Qoder CN style IDE hosts (`QoderWork` is hook-only, not an IDE extension host)
+- `PingIsland/Services/Window/IDEExtensionInstaller.swift`: installs the VS Code-compatible terminal-focus extension used by Cursor / VS Code / CodeBuddy / Qoder IDE / Qoder CN style IDE hosts (`QoderWork` is hook-only, not an IDE extension host)
 - `PingIsland/UI`: SwiftUI views, reusable components, AppKit-backed window controllers
 - `PingIsland/Resources`: hook assets, entitlements, bundled fonts
 - `Prototype`: Swift package prototype and testbed

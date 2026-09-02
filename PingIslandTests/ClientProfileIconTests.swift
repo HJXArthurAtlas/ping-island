@@ -80,13 +80,27 @@ final class ClientProfileIconTests: XCTestCase {
     }
 
     func testQoderIDEHookProfileKeepsSeparateImplementation() throws {
-        let qoderProfile = try XCTUnwrap(ClientProfileRegistry.managedHookProfile(id: "qoder-hooks"))
-        let qoderEvents = Set(qoderProfile.events.map(\.name))
+        let hookProfile = try XCTUnwrap(ClientProfileRegistry.managedHookProfile(id: "qoder-hooks"))
+        let runtimeProfile = try XCTUnwrap(ClientProfileRegistry.runtimeProfile(id: "qoder"))
+        let extensionProfile = try XCTUnwrap(ClientProfileRegistry.ideExtensionProfile(id: "qoder-extension"))
+        let qoderEvents = Set(hookProfile.events.map(\.name))
 
         XCTAssertTrue(qoderEvents.contains("PostToolUseFailure"))
         XCTAssertFalse(qoderEvents.contains("SessionStart"))
-        XCTAssertNil(qoderProfile.events.first { $0.name == "PermissionRequest" }?.timeout)
-        XCTAssertEqual(qoderProfile.bridgeExtraArguments, ["--client-kind", "qoder"])
+        XCTAssertNil(hookProfile.events.first { $0.name == "PermissionRequest" }?.timeout)
+        XCTAssertEqual(
+            hookProfile.bridgeExtraArguments,
+            [
+                "--client-kind", "qoder",
+                "--client-name", "Qoder IDE",
+                "--client-originator", "Qoder IDE"
+            ]
+        )
+        XCTAssertEqual(hookProfile.title, "Qoder IDE")
+        XCTAssertEqual(runtimeProfile.displayName, "Qoder IDE")
+        XCTAssertEqual(extensionProfile.title, "Qoder IDE")
+        XCTAssertEqual(extensionProfile.uriScheme, "qoder-ide")
+        XCTAssertEqual(extensionProfile.localAppBundleIdentifiers, ["com.qoder.ide"])
     }
 
     func testQoderCNProfilesUseIndependentIdentityAndSharedConfiguration() throws {

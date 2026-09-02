@@ -212,7 +212,7 @@ func installerDeduplicatesManagedHooksButKeepsUnrelatedHooks() throws {
         ((hook["hooks"] as? [[String: Any]])?.first?["command"] as? String)
     }
     #expect(qoderPostToolUseFailureCommands.contains("/usr/bin/printf qoder-keep"))
-    #expect(qoderPostToolUseFailureCommands.contains { $0.contains("/.ping-island/bin/ping-island-bridge --source claude --client-kind qoder --client-name Qoder --client-originator Qoder") })
+    #expect(qoderPostToolUseFailureCommands.contains { $0.contains("/.ping-island/bin/ping-island-bridge --source claude --client-kind qoder --client-name 'Qoder IDE' --client-originator 'Qoder IDE'") })
     #expect(qoderHooks["UserPromptSubmit"] != nil)
     #expect(qoderHooks["PermissionRequest"] != nil)
     #expect(qoderHooks["Notification"] != nil)
@@ -225,7 +225,7 @@ func installerDeduplicatesManagedHooksButKeepsUnrelatedHooks() throws {
     let qoderCommands = qoderPreToolUse.compactMap { hook in
         ((hook["hooks"] as? [[String: Any]])?.first?["command"] as? String)
     }
-    let qoderIDECommand = "/.ping-island/bin/ping-island-bridge --source claude --client-kind qoder --client-name Qoder --client-originator Qoder"
+    let qoderIDECommand = "/.ping-island/bin/ping-island-bridge --source claude --client-kind qoder --client-name 'Qoder IDE' --client-originator 'Qoder IDE'"
     let qoderCLICommand = "/.ping-island/bin/ping-island-bridge --source claude --client-kind qoder-cli --client-name 'Qoder CLI' --client-origin cli --client-originator Qoder"
     #expect(qoderCommands.first?.contains(qoderCLICommand) == true)
     #expect(qoderCommands.contains { $0.contains(qoderIDECommand) })
