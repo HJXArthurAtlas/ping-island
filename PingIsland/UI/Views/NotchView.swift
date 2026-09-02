@@ -39,6 +39,8 @@ struct NotchView: View {
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
+    @Environment(\.islandExperienceTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var previousPendingIds: Set<String> = []
     @State private var manualAttentionTracker = SessionManualAttentionTracker()
     @State private var previousCompletedReadyIds: Set<String> = []
@@ -323,9 +325,22 @@ struct NotchView: View {
         )
     }
 
-    // Animation springs
-    private let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
-    private let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+    // Theme-owned panel motion. Reduced Motion keeps presentation changes direct.
+    private var openAnimation: Animation {
+        .spring(
+            response: theme.motion.panelResponse,
+            dampingFraction: theme.motion.panelDampingFraction,
+            blendDuration: 0
+        )
+    }
+
+    private var closeAnimation: Animation {
+        .spring(
+            response: theme.motion.panelResponse + 0.03,
+            dampingFraction: min(1, theme.motion.panelDampingFraction + 0.12),
+            blendDuration: 0
+        )
+    }
 
     // MARK: - Body
 
@@ -548,11 +563,17 @@ struct NotchView: View {
             .frame(maxWidth: isOpened ? notchSize.width : nil, alignment: .top)
             .padding(.horizontal, horizontalInset)
             .padding([.horizontal, .bottom], isOpened ? 12 : 0)
-            .background(.black)
+            .background {
+                theme.visual.islandSurface
+                    .overlay {
+                        ExperienceThemeGridTexture()
+                            .clipShape(currentNotchShape)
+                    }
+            }
             .clipShape(currentNotchShape)
             .overlay(alignment: .top) {
                 Rectangle()
-                    .fill(.black)
+                    .fill(theme.visual.islandTopSeparator)
                     .frame(height: 1)
                     .padding(.horizontal, topCornerRadius)
             }
@@ -562,16 +583,16 @@ struct NotchView: View {
                 maxHeight: isOpened ? notchSize.height : nil,
                 alignment: .top
             )
-            .animation(isOpened ? openAnimation : closeAnimation, value: viewModel.status)
-            .animation(viewModel.closedNotchResizeAnimation, value: notchSize)
-            .animation(.smooth, value: activityCoordinator.expandingActivity)
-            .animation(.smooth, value: hasPendingPermission)
-            .animation(.smooth, value: hasHumanIntervention)
-            .animation(.smooth, value: hasCompletedReadyState)
-            .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isBouncing)
+            .animation(reduceMotion ? nil : (isOpened ? openAnimation : closeAnimation), value: viewModel.status)
+            .animation(reduceMotion ? nil : viewModel.closedNotchResizeAnimation, value: notchSize)
+            .animation(reduceMotion ? nil : .smooth, value: activityCoordinator.expandingActivity)
+            .animation(reduceMotion ? nil : .smooth, value: hasPendingPermission)
+            .animation(reduceMotion ? nil : .smooth, value: hasHumanIntervention)
+            .animation(reduceMotion ? nil : .smooth, value: hasCompletedReadyState)
+            .animation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.5), value: isBouncing)
             .contentShape(Rectangle())
             .onHover { hovering in
-                withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                withAnimation(reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.8)) {
                     isHovering = hovering
                 }
             }

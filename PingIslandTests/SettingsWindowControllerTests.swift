@@ -107,7 +107,35 @@ final class SettingsWindowControllerTests: XCTestCase {
 
         XCTAssertTrue(window.isVisible)
         XCTAssertFalse(window.isMiniaturized)
-        XCTAssertFalse(window.isMovableByWindowBackground)
+        XCTAssertTrue(window.isMovableByWindowBackground)
+        XCTAssertTrue(window.isOpaque)
+        XCTAssertTrue(window.hasShadow)
+        XCTAssertEqual(window.appearance?.name, .darkAqua)
+        XCTAssertEqual(window.backgroundColor.alphaComponent, 1, accuracy: 0.001)
+        XCTAssertTrue(window.styleMask.contains(.titled))
+        XCTAssertTrue(window.styleMask.contains(.closable))
+        XCTAssertTrue(window.styleMask.contains(.miniaturizable))
+        XCTAssertTrue(window.styleMask.contains(.resizable))
+        XCTAssertTrue(window.styleMask.contains(.fullSizeContentView))
+        XCTAssertTrue(window.collectionBehavior.contains(.fullScreenPrimary))
+        XCTAssertFalse(window.collectionBehavior.contains(.fullScreenAuxiliary))
+        XCTAssertTrue(window.titlebarAppearsTransparent)
+        XCTAssertEqual(window.titlebarSeparatorStyle, .none)
+        XCTAssertEqual(window.toolbarStyle, .unified)
+
+        let toolbar = try XCTUnwrap(window.toolbar)
+        XCTAssertTrue(toolbar.isVisible)
+        XCTAssertFalse(toolbar.allowsUserCustomization)
+        XCTAssertEqual(toolbar.sizeMode, .regular)
+        XCTAssertFalse(toolbar.showsBaselineSeparator)
+
+        let closeButton = try XCTUnwrap(window.standardWindowButton(.closeButton))
+        let minimizeButton = try XCTUnwrap(window.standardWindowButton(.miniaturizeButton))
+        let zoomButton = try XCTUnwrap(window.standardWindowButton(.zoomButton))
+        XCTAssertFalse(closeButton.isHidden)
+        XCTAssertFalse(minimizeButton.isHidden)
+        XCTAssertFalse(zoomButton.isHidden)
+        XCTAssertTrue(zoomButton.isEnabled)
         XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size.width, SettingsWindowDefaults.defaultContentSize.width)
         XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size.height, SettingsWindowDefaults.defaultContentSize.height)
 
@@ -118,6 +146,17 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertFalse(window.isMiniaturized)
 
         controller.dismiss()
+    }
+
+    func testMacOSSettingsSidebarUsesOutlineSystemSymbolsWithoutChangingPingIslandIcons() {
+        for category in SettingsCategory.allCases {
+            XCTAssertNotNil(NSImage(systemSymbolName: category.icon, accessibilityDescription: nil))
+            XCTAssertNotNil(NSImage(systemSymbolName: category.macOSIcon, accessibilityDescription: nil))
+            XCTAssertFalse(category.macOSIcon.contains("fill"), "\(category) should use an outline symbol in macOS theme")
+        }
+
+        XCTAssertEqual(SettingsCategory.general.icon, "gearshape.fill")
+        XCTAssertEqual(SettingsCategory.general.macOSIcon, "gearshape")
     }
 
     func testSettingsWindowUsesAppLocaleRootView() throws {

@@ -32,6 +32,8 @@ class SessionMonitor: ObservableObject {
     private var questionDraftCache = SessionQuestionDraftCache()
     private var telemetryPendingAttentionSessionIDs: Set<String> = []
     private var soundEdgeTracker = SessionSoundEdgeTracker()
+    private var idleReminderSoundTracker = IdleReminderSoundTracker()
+    private var previousUsageSoundPercentage: Double?
 
     init(
         runtimeCoordinator: any RuntimeCoordinating = RuntimeCoordinator.shared,
@@ -289,6 +291,11 @@ class SessionMonitor: ObservableObject {
 
                 guard let interval = policy.sessionMaintenanceInterval else {
                     try? await Task.sleep(for: .seconds(30))
+                    guard !Task.isCancelled else { break }
+                    await MainActor.run {
+                        guard let self else { return }
+                        self.handleIdleReminderSound(self.instances)
+                    }
                     continue
                 }
 
@@ -363,6 +370,7 @@ class SessionMonitor: ObservableObject {
                 UsageSnapshotCacheStore.saveCodex(preferredCodexSnapshot)
             }
             self.codexUsageSnapshot = preferredCodexSnapshot
+            self.handleUsageSoundTransition()
             self.syncCodexThreadDiscovery(using: self.codexUsageSnapshot)
         }
     }
@@ -389,6 +397,7 @@ class SessionMonitor: ObservableObject {
             UsageSnapshotCacheStore.saveCodex(preferredSnapshot)
         }
         codexUsageSnapshot = preferredSnapshot
+        handleUsageSoundTransition()
         syncCodexThreadDiscovery(using: codexUsageSnapshot)
     }
 
@@ -863,6 +872,7 @@ class SessionMonitor: ObservableObject {
         let pendingSessions = visibleSessions.filter { $0.needsAttention }
         recordNewAttentionRequests(in: pendingSessions)
         handleSessionSoundTransitions(visibleSessions)
+        handleIdleReminderSound(visibleSessions)
         if visibleSessions != instances {
             instances = visibleSessions
         }
@@ -885,11 +895,40 @@ class SessionMonitor: ObservableObject {
 
     private func handleSessionSoundTransitions(_ sessions: [SessionState]) {
         guard let edge = soundEdgeTracker.edge(for: sessions) else { return }
+        playEventSoundIfNeeded(edge.event, sessions: edge.sessions)
+    }
+
+    private func handleIdleReminderSound(_ sessions: [SessionState], now: Date = Date()) {
+        let reminderSessions = idleReminderSoundTracker.sessionsNeedingReminder(
+            from: sessions,
+            now: now
+        )
+        guard !reminderSessions.isEmpty else { return }
+        playEventSoundIfNeeded(.idleReminder, sessions: reminderSessions)
+    }
+
+    private func handleUsageSoundTransition() {
+        let current = UsageSoundTransitionEvaluator.maximumUsedPercentage(
+            claude: claudeUsageSnapshot,
+            codex: codexUsageSnapshot
+        )
+        defer { previousUsageSoundPercentage = current }
+        guard let event = UsageSoundTransitionEvaluator.event(
+            previous: previousUsageSoundPercentage,
+            current: current
+        ) else { return }
+        AppSoundFeedback.play(event)
+    }
+
+    private func playEventSoundIfNeeded(
+        _ event: AppSoundFeedbackEvent,
+        sessions: [SessionState]
+    ) {
         guard AppSettings.soundEnabled else { return }
 
         Task {
-            guard await shouldPlayNotificationSound(for: edge.sessions) else { return }
-            AppSettings.playSound(for: edge.event)
+            guard await shouldPlayNotificationSound(for: sessions) else { return }
+            AppSoundFeedback.play(event)
         }
     }
 

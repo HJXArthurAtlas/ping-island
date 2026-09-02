@@ -143,7 +143,8 @@ Ping Island focuses on the moments that actually interrupt coding flow, then kee
 - **Multi-agent coverage** - Track Claude Code, Codex, Gemini CLI, Antigravity CLI, Hermes Agent, Pi Agent, Qwen Code, Kimi CLI, OpenClaw, OpenCode, Cursor, Qoder, Qoder CN, CodeBuddy, WorkBuddy, GitHub Copilot, and other compatible sessions in one place.
 - **OpenClaw gateway support** - Follow OpenClaw sessions from managed internal hooks, then refill the conversation from OpenClaw's local session transcripts so the Island UI can show the actual back-and-forth instead of a single inbound message.
 - **Codex hook + app-server sync** - Support Codex CLI hooks, live app-server threads, and rollout parsing fallback when needed.
-- **Custom sounds** - Pick per-event macOS sounds or import local sound packs for your own notification style.
+- **Experience themes** - Choose PingIsland native, macOS, or Pixel (with two classic palettes); themes coordinate window chrome, icons, controls, motion, and semantic audio.
+- **Custom sounds** - Pick per-event macOS sounds or import local sound packs without changing the selected visual experience.
 - **Custom agent mascots** - Give each client its own animated mascot override across the notch, session list, and hover UI.
 - **Buddy detach in v0.5.0+** - Drag the active Buddy out of the notch so it can stay nearby as an independent floating companion.
 - **Hermes courier-fox mascot** - Hermes Agent uses a gold courier fox with a winged helmet and satchel so plugin-hook sessions stay visually distinct from the Claude/Qwen family.
@@ -204,14 +205,45 @@ Ping Island currently ships a 4-category settings panel:
 - **General** - launch at login and baseline app behavior
 - **Display** - notch display target and placement behavior
 - **Mascot** - client mascot previews, per-client overrides, animation states
-- **Sound** - event-specific sounds, sound pack mode, sound pack import
+- **Sound** - experience-theme selection, event-specific sounds, sound pack mode, sound pack import
+
+## Experience Themes
+
+Ping Island includes three built-in experience themes under `Settings -> Sound -> Experience theme`:
+
+| Theme | What it changes | Recommended audio |
+| --- | --- | --- |
+| **PingIsland native** | The project's dark glass surfaces, rounded controls, and original visual language | Original built-in 8-bit mapping plus new semantic moments |
+| **macOS** | Native titlebar and traffic lights, full-height source-list sidebar, outline SF Symbols, system materials, and semantic controls | macOS system sounds |
+| **Pixel** | Silkscreen type, pixel grid surfaces, square controls, and code-rendered pixel icons | AgentIsland game-style 8-bit mapping |
+
+Pixel includes **Arcade Neon** and **Game Boy Olive** palettes. They share one
+component, motion, and sound implementation; changing the palette does not reset
+your sound selection.
+
+Themes are more than a color preset: the same theme supplies visual tokens,
+confirmation-action appearance, motion timing, lifecycle sound mappings, and
+auxiliary cues. In addition to the five configurable notification stages,
+themes cover launch, new sessions, approvals, waiting reminders, rapid submits,
+and usage warning/recovery edges.
+
+All three themes share the same native Settings window shell, so dragging,
+traffic lights, resizing and full-screen behavior remain consistent. The
+PingIsland, macOS and Pixel families then render distinct sidebar rows, icons,
+surfaces and controls inside that shell. Category selection updates immediately;
+heavier refresh work is deferred, cancellable and cached.
+
+Choosing a theme applies its recommended sound mode. You can then switch to a
+local CESP/OpenPeon sound pack; this changes audio only and does not replace the
+active visual or interaction theme. See [the theme architecture and extension
+guide](docs/experience-themes.md) for the contributor-facing contract.
 
 ## Custom Sounds
 
 Ping Island currently supports three sound modes under `Settings -> Sound`:
 
 - **System sounds** - choose a macOS sound for each event.
-- **Built-in 8-bit** - use Island's bundled retro sound set, including the fixed client startup sound.
+- **Built-in 8-bit** - use Island's bundled retro sound set, including themed startup and action feedback.
 - **Sound pack** - load a local OpenPeon / CESP-compatible pack from disk.
 
 ### Quick setup

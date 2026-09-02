@@ -13,7 +13,7 @@
 "系统与基础行为" = "系统与基础行为";
 "显示器与位置" = "显示器与位置";
 "客户端宠物与动作" = "客户端宠物与动作";
-"通知与提示音" = "通知与提示音";
+"主题与提示音" = "主题与提示音";
 "Hooks 与 IDE 扩展" = "Hooks 与 IDE 扩展";
 "版本与更新" = "版本与更新";
 
@@ -779,3 +779,19 @@
 "管理 ~/.qoder-cn/settings.json，按 Claude Code hooks 协议接入 qoderclicn" = "管理 ~/.qoder-cn/settings.json，按 Claude Code hooks 协议接入 qoderclicn";
 "管理 ~/.kimi-code/config.toml，按 Kimi CLI 官方 hooks 协议接入 Island" = "管理 ~/.kimi-code/config.toml，按 Kimi CLI 官方 hooks 协议接入 Island";
 "这会重新写入 %@ 的 Island hooks TOML 配置，并保留其他非 Island 设置。" = "这会重新写入 %@ 的 Island hooks TOML 配置，并保留其他非 Island 设置。";
+
+// 体验主题
+"体验主题" = "体验主题";
+"主题同时定义界面细节、确认操作反馈和推荐的提示音方案。导入主题音效包时，视觉主题会保持不变。" = "主题同时定义界面细节、确认操作反馈和推荐的提示音方案。导入主题音效包时，视觉主题会保持不变。";
+"选择主题会同步其推荐声音方案；之后仍可在下方改为系统音或 CESP 主题包。" = "选择主题会同步其推荐声音方案；之后仍可在下方改为系统音或 CESP 主题包。";
+"PingIsland 原生" = "PingIsland 原生";
+"延续 PingIsland 的深色玻璃界面与原有 8-bit 声音语言。" = "延续 PingIsland 的深色玻璃界面与原有 8-bit 声音语言。";
+"macOS" = "macOS";
+"系统材质、原生侧栏和 SF Symbols 组成的 macOS 风格。" = "系统材质、原生侧栏和 SF Symbols 组成的 macOS 风格。";
+"Pixel" = "Pixel";
+"像素字形、游戏机图标和 AgentIsland 8-bit 音效。" = "像素字形、游戏机图标和 AgentIsland 8-bit 音效。";
+"Pixel 配色" = "Pixel 配色";
+"Arcade Neon" = "Arcade Neon";
+"街机厅深色底与高对比霓虹色。" = "街机厅深色底与高对比霓虹色。";
+"Game Boy Olive" = "Game Boy Olive";
+"经典掌机的四阶橄榄绿色调。" = "经典掌机的四阶橄榄绿色调。";
