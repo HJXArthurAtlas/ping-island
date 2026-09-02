@@ -884,7 +884,7 @@ private extension BridgeEnvelope {
             effectiveExplicitName = "Qoder IDE"
         case "com.aliyun.lingma.ide":
             effectiveExplicitKind = "qoder-cn"
-            effectiveExplicitName = "Qoder CN"
+            effectiveExplicitName = "Qoder CN IDE"
         case "com.qoder.work":
             effectiveExplicitKind = "qoderwork"
             effectiveExplicitName = "QoderWork"

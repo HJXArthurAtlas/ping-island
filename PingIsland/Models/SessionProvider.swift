@@ -715,6 +715,7 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
             normalizedProfileID == "qoder-cn"
             || normalizedProfileID == "qoder-cn-cli"
             || normalizedName == "qoder cn"
+            || normalizedName == "qoder cn ide"
             || normalizedName == "qoder cn cli"
             || normalizedName == "qoderclicn"
             || normalizedOriginator == "qoder cn"
@@ -740,6 +741,7 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
             || normalized.bundleIdentifier?.lowercased() == "com.aliyun.lingma.ide"
             || normalized.ideHostProfile?.id == "qoder-cn-extension"
             || (normalizedProfileID == "qoder-cn" && !isQoderCNCLI)
+            || (normalizedName == "qoder cn ide" && !isQoderCNCLI)
         let hasQoderIDEHostEvidence =
             hostBundleIdentifier == "com.qoder.ide"
             || normalized.terminalBundleIdentifier?.lowercased() == "com.qoder.ide"
@@ -767,7 +769,7 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
             normalized.name = "QoderWork"
         } else if isQoderCNIDEHosted {
             normalized.profileID = "qoder-cn"
-            normalized.name = "Qoder CN"
+            normalized.name = "Qoder CN IDE"
         } else if isQoderIDEHosted {
             normalized.profileID = "qoder"
         } else if isQoderCNCLI || (isTerminalHosted && isQoderCNClient) {
@@ -786,10 +788,6 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
 
         if normalized.profileID?.lowercased() == "qoder" {
             normalized.name = "Qoder IDE"
-            if let launchURL = normalized.launchURL,
-               launchURL.lowercased().hasPrefix("qoder://") {
-                normalized.launchURL = "qoder-ide://" + String(launchURL.dropFirst("qoder://".count))
-            }
         }
 
         return normalized
@@ -954,14 +952,14 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
         case "com.qoder.work":
             return workspacePath.flatMap { workspaceURL(scheme: "qoder-work", path: $0) }
         case "com.qoder.ide":
-            return workspacePath.flatMap { workspaceURL(scheme: "qoder-ide", path: $0) }
+            return workspacePath.flatMap { workspaceURL(scheme: "qoder", path: $0) }
         case "com.aliyun.lingma.ide":
             return workspacePath.flatMap { workspaceURL(scheme: "qoder-cn", path: $0) }
         case "com.workbuddy.workbuddy":
             return workspacePath.flatMap { workspaceURL(scheme: "workbuddy", path: $0) }
         default:
             if normalizedBundleIdentifier.contains("qoder") {
-                return workspacePath.flatMap { workspaceURL(scheme: "qoder-ide", path: $0) }
+                return workspacePath.flatMap { workspaceURL(scheme: "qoder", path: $0) }
             }
             if normalizedBundleIdentifier.contains("trae") {
                 return workspacePath.flatMap { workspaceURL(scheme: "trae", path: $0) }

@@ -500,7 +500,7 @@ func installerKeepsQoderCNDesktopAndCLIHooksSeparateInSharedSettings() throws {
         (entry["hooks"] as? [[String: Any]])?.first?["command"] as? String
     }
     #expect(commands.first?.contains("--client-kind qoder-cn-cli") == true)
-    #expect(commands.contains { $0.contains("--client-kind qoder-cn --client-name 'Qoder CN'") })
+    #expect(commands.contains { $0.contains("--client-kind qoder-cn --client-name 'Qoder CN IDE' --client-originator 'Qoder CN IDE'") })
 
     let cliHook = try #require((preToolUse.first?["hooks"] as? [[String: Any]])?.first)
     #expect(cliHook["timeout"] as? Int == 86_400)

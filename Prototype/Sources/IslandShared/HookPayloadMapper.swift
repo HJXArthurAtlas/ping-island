@@ -750,9 +750,10 @@ public enum HookPayloadMapper {
         }
         if bundleIdentifier == "com.aliyun.lingma.ide"
             || hints.contains("qoder cn.app")
+            || hints.contains("qoder cn ide.app")
             || hints.contains("com.aliyun.lingma.ide")
             || environment.keys.contains(where: { $0.hasPrefix("QODERCN_") || $0.hasPrefix("QODER_CN_") }) {
-            return ("Qoder CN", "com.aliyun.lingma.ide")
+            return ("Qoder CN IDE", "com.aliyun.lingma.ide")
         }
         if bundleIdentifier == "com.qoder.ide"
             || hints.contains("qoder ide.app")

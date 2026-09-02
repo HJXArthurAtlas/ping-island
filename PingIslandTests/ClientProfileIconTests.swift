@@ -99,19 +99,31 @@ final class ClientProfileIconTests: XCTestCase {
         XCTAssertEqual(hookProfile.title, "Qoder IDE")
         XCTAssertEqual(runtimeProfile.displayName, "Qoder IDE")
         XCTAssertEqual(extensionProfile.title, "Qoder IDE")
-        XCTAssertEqual(extensionProfile.uriScheme, "qoder-ide")
+        XCTAssertEqual(extensionProfile.uriScheme, "qoder")
         XCTAssertEqual(extensionProfile.localAppBundleIdentifiers, ["com.qoder.ide"])
     }
 
     func testQoderCNProfilesUseIndependentIdentityAndSharedConfiguration() throws {
         let desktopProfile = try XCTUnwrap(ClientProfileRegistry.managedHookProfile(id: "qoder-cn-hooks"))
         let cliProfile = try XCTUnwrap(ClientProfileRegistry.managedHookProfile(id: "qoder-cn-cli-hooks"))
+        let runtimeProfile = try XCTUnwrap(ClientProfileRegistry.runtimeProfile(id: "qoder-cn"))
         let extensionProfile = try XCTUnwrap(ClientProfileRegistry.ideExtensionProfile(id: "qoder-cn-extension"))
 
         XCTAssertEqual(desktopProfile.configurationRelativePaths, [".qoder-cn/settings.json"])
         XCTAssertEqual(cliProfile.configurationRelativePaths, desktopProfile.configurationRelativePaths)
         XCTAssertEqual(desktopProfile.localAppBundleIdentifiers, ["com.aliyun.lingma.ide"])
         XCTAssertEqual(extensionProfile.localAppBundleIdentifiers, ["com.aliyun.lingma.ide"])
+        XCTAssertEqual(desktopProfile.title, "Qoder CN IDE")
+        XCTAssertEqual(
+            desktopProfile.bridgeExtraArguments,
+            [
+                "--client-kind", "qoder-cn",
+                "--client-name", "Qoder CN IDE",
+                "--client-originator", "Qoder CN IDE"
+            ]
+        )
+        XCTAssertEqual(runtimeProfile.displayName, "Qoder CN IDE")
+        XCTAssertEqual(extensionProfile.title, "Qoder CN IDE")
         XCTAssertEqual(extensionProfile.uriScheme, "qoder-cn")
         XCTAssertEqual(extensionProfile.extensionRootRelativePaths, [".qoder-cn/extensions"])
         XCTAssertEqual(

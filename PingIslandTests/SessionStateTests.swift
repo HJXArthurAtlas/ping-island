@@ -853,13 +853,13 @@ final class SessionStateTests: XCTestCase {
         )
     }
 
-    func testQoderIDELaunchURLUsesQoderIDEScheme() {
+    func testQoderIDELaunchURLKeepsQoderScheme() {
         XCTAssertEqual(
             SessionClientInfo.appLaunchURL(
                 bundleIdentifier: "com.qoder.ide",
                 workspacePath: "/tmp/project"
             ),
-            "qoder-ide://file/tmp/project"
+            "qoder://file/tmp/project"
         )
     }
 
@@ -1571,7 +1571,7 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(normalized.name, "Qoder IDE")
         XCTAssertEqual(normalized.badgeLabel(for: .claude), "Qoder IDE")
         XCTAssertEqual(normalized.interactionLabel(for: .claude), "Qoder IDE")
-        XCTAssertEqual(normalized.launchURL, "qoder-ide://file/tmp/project")
+        XCTAssertEqual(normalized.launchURL, "qoder://file/tmp/project")
     }
 
     func testIDEHostedQoderCLIMetadataNormalizesBackToIDEIdentity() {
@@ -1618,7 +1618,8 @@ final class SessionStateTests: XCTestCase {
         ).normalizedForClaudeRouting()
 
         XCTAssertEqual(desktop.profileID, "qoder-cn")
-        XCTAssertEqual(desktop.name, "Qoder CN")
+        XCTAssertEqual(desktop.name, "Qoder CN IDE")
+        XCTAssertEqual(desktop.badgeLabel(for: .claude), "Qoder CN IDE")
         XCTAssertEqual(desktop.ideHostProfile?.id, "qoder-cn-extension")
         XCTAssertTrue(desktop.isQoderNotifyOnlyIDEClient)
         XCTAssertFalse(desktop.isQoderCLIClient)
@@ -1626,6 +1627,16 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(cli.name, "Qoder CN CLI")
         XCTAssertTrue(cli.isQoderCLIClient)
         XCTAssertTrue(cli.supportsCustomAskUserQuestionInput)
+    }
+
+    func testQoderCNIDENameNormalizesWithoutBundleMetadata() {
+        let normalized = SessionClientInfo(
+            kind: .qoder,
+            name: "Qoder CN IDE"
+        ).normalizedForClaudeRouting()
+
+        XCTAssertEqual(normalized.profileID, "qoder-cn")
+        XCTAssertEqual(normalized.name, "Qoder CN IDE")
     }
 
     func testQoderWorkDoesNotResolveToIDEExtensionHost() {

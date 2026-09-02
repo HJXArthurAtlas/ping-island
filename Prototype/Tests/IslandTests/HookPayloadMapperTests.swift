@@ -539,8 +539,8 @@ func mapsQoderCNIDEContextAheadOfGenericVSCodeDetection() throws {
         arguments: [
             "island-bridge", "--source", "claude",
             "--client-kind", "qoder-cn",
-            "--client-name", "Qoder CN",
-            "--client-originator", "Qoder CN"
+            "--client-name", "Qoder CN IDE",
+            "--client-originator", "Qoder CN IDE"
         ],
         environment: [
             "TERM_PROGRAM": "vscode",
@@ -552,9 +552,10 @@ func mapsQoderCNIDEContextAheadOfGenericVSCodeDetection() throws {
     )
 
     #expect(envelope.terminalContext.terminalBundleID == "com.aliyun.lingma.ide")
-    #expect(envelope.terminalContext.ideName == "Qoder CN")
+    #expect(envelope.terminalContext.ideName == "Qoder CN IDE")
     #expect(envelope.terminalContext.ideBundleID == "com.aliyun.lingma.ide")
     #expect(envelope.metadata["client_kind"] == "qoder-cn")
+    #expect(envelope.metadata["client_originator"] == "Qoder CN IDE")
 }
 
 @Test
