@@ -106,7 +106,7 @@ final class SettingsWindowControllerTests: XCTestCase {
 
         XCTAssertTrue(window.isVisible)
         XCTAssertFalse(window.isMiniaturized)
-        XCTAssertTrue(window.isMovableByWindowBackground)
+        XCTAssertFalse(window.isMovableByWindowBackground)
         XCTAssertFalse(window.isOpaque)
         XCTAssertTrue(window.hasShadow)
         XCTAssertEqual(window.backgroundColor.alphaComponent, 0, accuracy: 0.001)
@@ -146,21 +146,10 @@ final class SettingsWindowControllerTests: XCTestCase {
         controller.dismiss()
     }
 
-    func testSettingsSliderConsumesDragInsteadOfMovingWindow() {
-        let slider = SettingsWindowSliderControl(frame: .zero)
+    func testSettingsWindowReservesContentDragsForControls() throws {
+        let window = try XCTUnwrap(SettingsWindowController.shared.window)
 
-        XCTAssertFalse(slider.mouseDownCanMoveWindow)
-    }
-
-    func testSettingsSliderSuspendsWindowDraggingOnlyWhileTracking() {
-        let window = NSWindow()
-        window.isMovableByWindowBackground = true
-
-        SettingsWindowSliderControl.withWindowDraggingSuspended(in: window) {
-            XCTAssertFalse(window.isMovableByWindowBackground)
-        }
-
-        XCTAssertTrue(window.isMovableByWindowBackground)
+        XCTAssertFalse(window.isMovableByWindowBackground)
     }
 
     func testMacOSSettingsSidebarUsesOutlineSystemSymbolsWithoutChangingPingIslandIcons() {

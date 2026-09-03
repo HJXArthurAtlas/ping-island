@@ -350,6 +350,9 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
     }
 
     func testFloatingPetAnchorRoundTripsThroughVisibleFrameRatios() {
+        let originalScale = AppSettings.floatingPetScale
+        AppSettings.floatingPetScale = 1
+        defer { AppSettings.floatingPetScale = originalScale }
         let visibleFrame = CGRect(x: 40, y: 24, width: 1280, height: 720)
         let petAnchor = CGPoint(x: 1110, y: 144)
 
@@ -443,6 +446,30 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
         XCTAssertEqual(petMetrics.scale, 10, accuracy: 0.001)
         XCTAssertEqual(petMetrics.mascotDisplaySize, 460, accuracy: 0.5)
         XCTAssertEqual(petMetrics.petHitFrame, 920, accuracy: 0.5)
+        XCTAssertEqual(petMetrics.floatingUsageBoltFontSize, 80, accuracy: 0.5)
+        XCTAssertEqual(petMetrics.activeCountFontSize(for: 1), 92, accuracy: 0.5)
+    }
+
+    func testFloatingPetOverlaySpacingDoesNotGrowWithScale() {
+        let standardMetrics = DetachedIslandPanelMetrics.petMetrics(scale: 1)
+        let enlargedMetrics = DetachedIslandPanelMetrics.petMetrics(scale: 6)
+
+        XCTAssertEqual(enlargedMetrics.badgeOffset, standardMetrics.badgeOffset)
+        XCTAssertEqual(
+            enlargedMetrics.floatingUsageBoltGap,
+            standardMetrics.floatingUsageBoltGap,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            enlargedMetrics.activeCountFontSize(for: 1),
+            standardMetrics.activeCountFontSize(for: 1) * 6,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            enlargedMetrics.floatingUsageBoltFontSize,
+            standardMetrics.floatingUsageBoltFontSize * 6,
+            accuracy: 0.001
+        )
     }
 
     func testFloatingPetMetricsClampToSupportedScaleRange() {

@@ -103,7 +103,9 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.title = ""
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
+        // Keep content controls authoritative for pointer drags. The native
+        // titlebar remains the dedicated window-drag region.
+        window.isMovableByWindowBackground = false
         // The SwiftUI theme owns the full window surface, including the area
         // behind the native traffic lights. Keep the AppKit shell transparent
         // so it cannot introduce a fixed titlebar color between themes.

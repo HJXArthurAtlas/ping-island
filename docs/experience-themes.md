@@ -59,7 +59,9 @@ local CESP/OpenPeon pack. Changing only the Pixel palette does not reset audio.
 
 The Settings window has one shared native AppKit shell for every theme. It owns
 the titled/resizable/full-screen window, unified titlebar, native traffic
-lights, immediate background dragging and content insets. Its backing is
+lights, titlebar dragging and content insets. Content-area background dragging
+is disabled so sliders and other interactive controls always own their pointer
+gestures. The shell's backing is
 transparent, so the active theme's sidebar and detail surfaces continue behind
 the traffic lights instead of leaving a fixed-color strip across the top. Theme
 code does not draw replacement traffic lights or intercept window dragging.

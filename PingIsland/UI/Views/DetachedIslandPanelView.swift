@@ -8,7 +8,8 @@ struct DetachedIslandPetMetrics: Equatable {
     let petHitFrame: CGFloat
     let mascotDisplaySize: CGFloat
     let badgeOffset: CGSize
-    let floatingUsageBoltVerticalOffset: CGFloat
+    let floatingUsageBoltGap: CGFloat
+    let floatingUsageBoltFontSize: CGFloat
 
     static let minimumScale = CGFloat(AppSettingsStore.minimumFloatingPetScale)
     static let maximumScale = CGFloat(AppSettingsStore.maximumFloatingPetScale)
@@ -20,17 +21,18 @@ struct DetachedIslandPetMetrics: Equatable {
         self.petVisualFrame = 74 * sanitizedScale
         self.petHitFrame = 92 * sanitizedScale
         self.mascotDisplaySize = 46 * sanitizedScale
-        self.badgeOffset = CGSize(width: -6 * sanitizedScale, height: -10 * sanitizedScale)
-        self.floatingUsageBoltVerticalOffset = 6 * sanitizedScale
+        self.badgeOffset = CGSize(width: 8, height: 4)
+        self.floatingUsageBoltGap = 9
+        self.floatingUsageBoltFontSize = 8 * sanitizedScale
+    }
+
+    func activeCountFontSize(for count: Int) -> CGFloat {
+        (count >= 10 ? 8.2 : 9.2) * scale
     }
 }
 
 enum DetachedIslandPanelMetrics {
-    static let petVisualFrame: CGFloat = DetachedIslandPetMetrics.standard.petVisualFrame
-    static let petHitFrame: CGFloat = DetachedIslandPetMetrics.standard.petHitFrame
-    static let mascotDisplaySize: CGFloat = DetachedIslandPetMetrics.standard.mascotDisplaySize
     static let mascotRenderScale: CGFloat = 1.75
-    static let badgeOffset = DetachedIslandPetMetrics.standard.badgeOffset
     static let bubbleGap: CGFloat = 8
     static let leftBubbleGap: CGFloat = 2
     static let bubbleTailWidth: CGFloat = 30
@@ -44,8 +46,6 @@ enum DetachedIslandPanelMetrics {
     static let bubbleVerticalPadding: CGFloat = 4
     static let usageFooterReservedHeight: CGFloat = 34
     static let usageFooterVerticalOffset: CGFloat = -3
-    static let floatingUsageBoltVerticalOffset: CGFloat =
-        DetachedIslandPetMetrics.standard.floatingUsageBoltVerticalOffset
     static let settingsHintBubbleSize = CGSize(width: 248, height: 92)
     static let completionBubbleMinimumHeight: CGFloat = 120
     static let completionBubbleFallbackHeight: CGFloat = 180
@@ -912,18 +912,13 @@ private struct DetachedFloatingPetInteractionView: View {
     let onDragEnded: () -> Void
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            DetachedFloatingMascotView(
-                kind: mascotKind,
-                status: mascotStatus,
-                petMetrics: petMetrics,
-                isDragging: isDragging
-            )
-            .frame(
-                width: petMetrics.petVisualFrame,
-                height: petMetrics.petVisualFrame
-            )
-
+        DetachedFloatingMascotView(
+            kind: mascotKind,
+            status: mascotStatus,
+            petMetrics: petMetrics,
+            isDragging: isDragging
+        )
+        .overlay(alignment: .bottomTrailing) {
             if activeCount > 0 {
                 activeCountBadge
                     .offset(
@@ -932,17 +927,26 @@ private struct DetachedFloatingPetInteractionView: View {
                     )
             }
         }
+        .overlay(alignment: .top) {
+            if !usageWindows.isEmpty {
+                DetachedFloatingUsageBoltView(
+                    windows: usageWindows,
+                    fontSize: petMetrics.floatingUsageBoltFontSize
+                )
+                    .offset(
+                        y: -(petMetrics.floatingUsageBoltFontSize + petMetrics.floatingUsageBoltGap)
+                    )
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(
+            width: petMetrics.petVisualFrame,
+            height: petMetrics.petVisualFrame
+        )
         .frame(
             width: petMetrics.petHitFrame,
             height: petMetrics.petHitFrame
         )
-        .overlay(alignment: .top) {
-            if !usageWindows.isEmpty {
-                DetachedFloatingUsageBoltView(windows: usageWindows)
-                    .offset(y: petMetrics.floatingUsageBoltVerticalOffset)
-                    .allowsHitTesting(false)
-            }
-        }
         .rotationEffect(.degrees(isDragging ? -7 : 0))
         .scaleEffect(isDragging ? 1.08 : 1)
         .animation(.spring(response: 0.22, dampingFraction: 0.68), value: isDragging)
@@ -969,7 +973,7 @@ private struct DetachedFloatingPetInteractionView: View {
         PixelNumberView(
             value: activeCount,
             color: .white.opacity(0.96),
-            fontSize: activeCount >= 10 ? 8.2 : 9.2,
+            fontSize: petMetrics.activeCountFontSize(for: activeCount),
             weight: .semibold,
             tracking: activeCount >= 10 ? -0.15 : -0.05
         )
@@ -978,6 +982,7 @@ private struct DetachedFloatingPetInteractionView: View {
 
 private struct DetachedFloatingUsageBoltView: View {
     let windows: [UsageSummaryWindow]
+    let fontSize: CGFloat
 
     @ObservedObject private var energyGovernor = EnergyGovernor.shared
 
@@ -1001,7 +1006,7 @@ private struct DetachedFloatingUsageBoltView: View {
             let lift = isAnimated ? sin(phase * .pi * 2 / 1.6) * 1.2 : 0
 
             Image(systemName: "bolt.fill")
-                .font(.system(size: 8, weight: .black))
+                .font(.system(size: fontSize, weight: .black))
                 .foregroundColor(color(for: window.severity))
                 .scaleEffect((window.severity == .critical ? 1.08 : 1) * pulse)
                 .offset(y: lift)

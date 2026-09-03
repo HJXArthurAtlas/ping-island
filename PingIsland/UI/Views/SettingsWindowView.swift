@@ -6359,12 +6359,9 @@ private struct SettingsSliderLine: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            SettingsWindowSlider(
-                value: $value,
-                range: range,
-                step: step,
-                accessibilityLabel: title
-            )
+            Slider(value: $value, in: range, step: step)
+                .tint(TerminalColors.blue)
+                .accessibilityLabel(Text(appLocalized: title))
 
             if showsTickMarks {
                 HStack(spacing: 0) {
@@ -6386,93 +6383,6 @@ private struct SettingsSliderLine: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
-    }
-}
-
-private struct SettingsWindowSlider: NSViewRepresentable {
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
-    let accessibilityLabel: String
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeNSView(context: Context) -> SettingsWindowSliderControl {
-        let slider = SettingsWindowSliderControl(frame: .zero)
-        slider.target = context.coordinator
-        slider.action = #selector(Coordinator.valueChanged(_:))
-        slider.isContinuous = true
-        slider.controlSize = .regular
-        slider.trackFillColor = NSColor(
-            srgbRed: 0.4,
-            green: 0.6,
-            blue: 1,
-            alpha: 1
-        )
-        configure(slider)
-        return slider
-    }
-
-    func updateNSView(_ slider: SettingsWindowSliderControl, context: Context) {
-        context.coordinator.parent = self
-        configure(slider)
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
-    }
-
-    private func configure(_ slider: NSSlider) {
-        slider.minValue = range.lowerBound
-        slider.maxValue = range.upperBound
-        slider.altIncrementValue = step
-        slider.isEnabled = isEnabled
-        slider.setAccessibilityLabel(AppLocalization.string(accessibilityLabel))
-
-        let boundedValue = min(max(value, range.lowerBound), range.upperBound)
-        if slider.doubleValue != boundedValue {
-            slider.doubleValue = boundedValue
-        }
-    }
-
-    final class Coordinator: NSObject {
-        var parent: SettingsWindowSlider
-
-        init(parent: SettingsWindowSlider) {
-            self.parent = parent
-        }
-
-        @objc func valueChanged(_ slider: NSSlider) {
-            let range = parent.range
-            let step = parent.step
-            let stepCount = ((slider.doubleValue - range.lowerBound) / step).rounded()
-            let steppedValue = range.lowerBound + (stepCount * step)
-            let boundedValue = min(max(steppedValue, range.lowerBound), range.upperBound)
-
-            slider.doubleValue = boundedValue
-            parent.value = boundedValue
-        }
-    }
-}
-
-final class SettingsWindowSliderControl: NSSlider {
-    override var mouseDownCanMoveWindow: Bool { false }
-
-    override func mouseDown(with event: NSEvent) {
-        Self.withWindowDraggingSuspended(in: window) {
-            super.mouseDown(with: event)
-        }
-    }
-
-    static func withWindowDraggingSuspended<T>(
-        in window: NSWindow?,
-        perform action: () -> T
-    ) -> T {
-        guard let window else { return action() }
-
-        let wasMovableByBackground = window.isMovableByWindowBackground
-        window.isMovableByWindowBackground = false
-        defer { window.isMovableByWindowBackground = wasMovableByBackground }
-        return action()
     }
 }
 
