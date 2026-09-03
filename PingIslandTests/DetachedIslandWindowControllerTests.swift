@@ -1100,15 +1100,8 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
             makeCodexCompletedSession(id: sessionId, lastActivity: activityAt)
         ])
 
-        let notReopened = expectation(description: "dismissed codex completion stays dismissed")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            XCTAssertNil(controller.currentActiveCompletionNotificationForTesting)
-            XCTAssertEqual(controller.renderedBubbleStateForTesting, .hidden)
-            XCTAssertFalse(controller.isBubbleVisibleForTesting)
-            notReopened.fulfill()
-        }
-
-        wait(for: [notReopened], timeout: 1.0)
+        XCTAssertNil(controller.currentActiveCompletionNotificationForTesting)
+        waitForBubbleHidden(controller)
     }
 
     func testDismissedCodexCompletionCanOpenForLaterActivity() {
