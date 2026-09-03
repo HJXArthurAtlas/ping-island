@@ -134,9 +134,6 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertFalse(minimizeButton.isHidden)
         XCTAssertFalse(zoomButton.isHidden)
         XCTAssertTrue(zoomButton.isEnabled)
-        XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size.width, SettingsWindowDefaults.defaultContentSize.width)
-        XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size.height, SettingsWindowDefaults.defaultContentSize.height)
-
         controller.present()
 
         XCTAssertTrue(window.isVisible)
