@@ -152,6 +152,17 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertFalse(slider.mouseDownCanMoveWindow)
     }
 
+    func testSettingsSliderSuspendsWindowDraggingOnlyWhileTracking() {
+        let window = NSWindow()
+        window.isMovableByWindowBackground = true
+
+        SettingsWindowSliderControl.withWindowDraggingSuspended(in: window) {
+            XCTAssertFalse(window.isMovableByWindowBackground)
+        }
+
+        XCTAssertTrue(window.isMovableByWindowBackground)
+    }
+
     func testMacOSSettingsSidebarUsesOutlineSystemSymbolsWithoutChangingPingIslandIcons() {
         for category in SettingsCategory.allCases {
             XCTAssertNotNil(NSImage(systemSymbolName: category.icon, accessibilityDescription: nil))

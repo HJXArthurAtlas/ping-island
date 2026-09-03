@@ -438,16 +438,17 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
     }
 
     func testFloatingPetScaleSupportsMaximumSize() {
-        let petMetrics = DetachedIslandPanelMetrics.petMetrics(scale: 1.75)
+        let petMetrics = DetachedIslandPanelMetrics.petMetrics(scale: 10)
 
-        XCTAssertEqual(petMetrics.scale, 1.75, accuracy: 0.001)
-        XCTAssertEqual(petMetrics.mascotDisplaySize, 80.5, accuracy: 0.5)
-        XCTAssertEqual(petMetrics.petHitFrame, 161, accuracy: 0.5)
+        XCTAssertEqual(petMetrics.scale, 10, accuracy: 0.001)
+        XCTAssertEqual(petMetrics.mascotDisplaySize, 460, accuracy: 0.5)
+        XCTAssertEqual(petMetrics.petHitFrame, 920, accuracy: 0.5)
     }
 
     func testFloatingPetMetricsClampToSupportedScaleRange() {
         XCTAssertEqual(DetachedIslandPetMetrics(scale: 0.5).scale, 1, accuracy: 0.001)
-        XCTAssertEqual(DetachedIslandPetMetrics(scale: 2).scale, 1.75, accuracy: 0.001)
+        XCTAssertEqual(DetachedIslandPetMetrics(scale: 2).scale, 2, accuracy: 0.001)
+        XCTAssertEqual(DetachedIslandPetMetrics(scale: 12).scale, 10, accuracy: 0.001)
     }
 
     func testActiveCountOnlyTracksActiveSessions() {

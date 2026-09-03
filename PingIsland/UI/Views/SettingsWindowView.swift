@@ -3429,7 +3429,7 @@ private struct SettingsPanelContentView: View {
                     SettingsLineDivider()
                     SettingsSliderLine(
                         title: "宠物大小",
-                        subtitle: "按倍率调整独立悬浮宠物尺寸，最大可放大至 1.75 倍。",
+                        subtitle: "按倍率调整独立悬浮宠物尺寸，最大可放大至 10 倍。",
                         value: $settings.floatingPetScale,
                         range: AppSettings.floatingPetScaleRange,
                         step: 0.05,
@@ -6456,6 +6456,24 @@ private struct SettingsWindowSlider: NSViewRepresentable {
 
 final class SettingsWindowSliderControl: NSSlider {
     override var mouseDownCanMoveWindow: Bool { false }
+
+    override func mouseDown(with event: NSEvent) {
+        Self.withWindowDraggingSuspended(in: window) {
+            super.mouseDown(with: event)
+        }
+    }
+
+    static func withWindowDraggingSuspended<T>(
+        in window: NSWindow?,
+        perform action: () -> T
+    ) -> T {
+        guard let window else { return action() }
+
+        let wasMovableByBackground = window.isMovableByWindowBackground
+        window.isMovableByWindowBackground = false
+        defer { window.isMovableByWindowBackground = wasMovableByBackground }
+        return action()
+    }
 }
 
 private struct ShortcutSettingsLine: View {
@@ -6964,7 +6982,15 @@ private struct IslandSurfaceModePreviewScene: View {
     }
 
     private var previewScale: CGFloat {
-        CGFloat(floatingPetScale)
+        let scale = CGFloat(floatingPetScale)
+        let uncompressedLimit: CGFloat = 1.75
+        guard scale > uncompressedLimit else { return scale }
+
+        // Keep the compact mode card readable across the wider runtime range.
+        // The live detached pet still uses the exact configured scale.
+        let runtimeRange = CGFloat(AppSettingsStore.maximumFloatingPetScale) - uncompressedLimit
+        let progress = (scale - uncompressedLimit) / runtimeRange
+        return uncompressedLimit + (progress * 0.25)
     }
 }
 

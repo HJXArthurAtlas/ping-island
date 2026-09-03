@@ -267,7 +267,7 @@ private enum LegacyFloatingPetSizeMode: String {
         case .large:
             return 1.16
         case .extraLarge:
-            return AppSettingsStore.maximumFloatingPetScale
+            return 1.75
         }
     }
 }
@@ -381,7 +381,7 @@ final class AppSettingsStore: ObservableObject {
     nonisolated static let maximumNotchModuleWidth: Double = 420
     nonisolated static let defaultFloatingPetScale: Double = 1
     nonisolated static let minimumFloatingPetScale: Double = 1
-    nonisolated static let maximumFloatingPetScale: Double = 1.75
+    nonisolated static let maximumFloatingPetScale: Double = 10
 
     private let defaults: UserDefaults
     private let bridgeRuntimeConfigWriter: (BridgeRuntimeConfigSnapshot) -> Void

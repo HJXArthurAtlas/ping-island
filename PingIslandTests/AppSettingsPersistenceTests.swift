@@ -420,7 +420,10 @@ final class AppSettingsPersistenceTests: XCTestCase {
         XCTAssertEqual(store.floatingPetScale, 1, accuracy: 0.001)
 
         store.floatingPetScale = 2
-        XCTAssertEqual(store.floatingPetScale, 1.75, accuracy: 0.001)
+        XCTAssertEqual(store.floatingPetScale, 2, accuracy: 0.001)
+
+        store.floatingPetScale = 12
+        XCTAssertEqual(store.floatingPetScale, 10, accuracy: 0.001)
     }
 
     func testLegacyFloatingPetSizeModesMigrateToCustomScale() {
