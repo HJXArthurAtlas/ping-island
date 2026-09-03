@@ -274,6 +274,8 @@ actor SessionStore {
             )
         case .copilot:
             runtimeClientInfo = SessionClientInfo.default(for: .copilot)
+        case .omp:
+            runtimeClientInfo = SessionClientInfo.default(for: .omp)
         }
 
         let resolvedClientInfo = normalizedClientInfo(
@@ -4655,6 +4657,8 @@ actor SessionStore {
         case .kimi:
             return clientInfo
         case .gemini:
+            return clientInfo
+        case .omp:
             return clientInfo
         }
     }

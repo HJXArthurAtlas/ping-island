@@ -123,7 +123,7 @@ public enum HookPayloadMapper {
         }
 
         switch provider {
-        case .claude, .gemini:
+        case .claude, .gemini, .omp:
             let clientKind = normalizedClientKind(from: metadata)
             if isAntigravityHookClient(clientKind) {
                 return antigravityStdoutPayload(response: response, decision: decision)
@@ -2303,6 +2303,8 @@ private extension AgentProvider {
             return "Kimi"
         case .gemini:
             return "Gemini"
+        case .omp:
+            return "Oh My Pi"
         }
     }
 }
