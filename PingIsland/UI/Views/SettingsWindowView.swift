@@ -2548,6 +2548,9 @@ private final class SettingsWindowThemeBridgeView: NSView {
             frameView.addSubview(backdrop, positioned: .below, relativeTo: window.contentView)
         }
 
+        // One AppKit backdrop owns the base color from the native titlebar
+        // through the body. Window-mode SwiftUI content stays transparent over
+        // this layer, avoiding both a color seam and double material blending.
         backdrop.frame = frameView.bounds
         backdrop.configure(
             chromeStyle: chromeStyle,
@@ -2573,6 +2576,7 @@ private final class SettingsWindowBackdropView: NSView {
 
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.masksToBounds = true
 
         for materialView in [sidebarMaterial, detailMaterial] {
             materialView.blendingMode = .behindWindow
@@ -2649,8 +2653,8 @@ private enum SettingsPanelMetrics {
     static let popoverSize = CGSize(width: 760, height: 620)
     static let windowSidebarWidth: CGFloat = 236
     static let popoverSidebarWidth: CGFloat = 212
-    static let windowSidebarTopInset: CGFloat = 56
-    static let windowDetailTopInset: CGFloat = 72
+    static let windowSidebarTopInset: CGFloat = 18
+    static let windowDetailTopInset: CGFloat = 28
     static let windowContentTopInset: CGFloat = 0
     static let popoverContentTopInset: CGFloat = 0
     static let outerPadding: CGFloat = 0
@@ -2686,7 +2690,6 @@ private struct SettingsPanelContentView: View {
         ZStack {
             panelBackground
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .ignoresSafeArea()
                 .allowsHitTesting(false)
 
             HStack(spacing: 0) {
@@ -2710,6 +2713,14 @@ private struct SettingsPanelContentView: View {
                 alignment: .topLeading
             )
         }
+        .overlay(alignment: .top) {
+            if presentation == .window {
+                Rectangle()
+                    .fill(theme.visual.settingsCardBorder.opacity(0.72))
+                    .frame(height: 1)
+                    .accessibilityHidden(true)
+            }
+        }
         .background {
             if presentation == .window {
                 SettingsWindowThemeBridge(
@@ -2722,7 +2733,6 @@ private struct SettingsPanelContentView: View {
                 )
             }
         }
-        .ignoresSafeArea()
         .clipShape(
             RoundedRectangle(
                 cornerRadius: panelCornerRadius,
@@ -3048,57 +3058,42 @@ private struct SettingsPanelContentView: View {
 
     @ViewBuilder
     private var sidebarBackground: some View {
-        if presentation == .window,
-           theme.visual.settingsChromeStyle == .macOS {
-            SettingsGlassSurface(
-                material: .sidebar,
-                blendingMode: .withinWindow,
-                state: .followsWindowActiveState
-            )
-        } else {
-            sidebarShape
-                .fill(theme.visual.settingsSidebarSurface)
-                .overlay {
-                    ExperienceThemeGridTexture()
-                        .clipShape(sidebarShape)
-                }
-                .overlay {
-                    SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
-                        .clipShape(sidebarShape)
-                        .opacity(theme.visual.usesGlassMaterial ? 0.94 : 0)
-                }
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            theme.visual.primaryText.opacity(0.12),
-                            theme.visual.primaryText.opacity(0.04),
-                            Color.black.opacity(0.10)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+        sidebarShape
+            .fill(theme.visual.settingsSidebarSurface)
+            .overlay {
+                ExperienceThemeGridTexture()
                     .clipShape(sidebarShape)
-                }
-                .overlay(alignment: .topTrailing) {
-                    Circle()
-                        .fill(sidebarAccentGlow)
-                        .frame(width: 120, height: 120)
-                        .blur(radius: 36)
-                        .offset(x: 28, y: -26)
-                }
-        }
+            }
+            .overlay {
+                SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
+                    .clipShape(sidebarShape)
+                    .opacity(theme.visual.usesGlassMaterial ? 0.94 : 0)
+            }
+            .overlay {
+                LinearGradient(
+                    colors: [
+                        theme.visual.primaryText.opacity(0.12),
+                        theme.visual.primaryText.opacity(0.04),
+                        Color.black.opacity(0.10)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .clipShape(sidebarShape)
+            }
+            .overlay(alignment: .topTrailing) {
+                Circle()
+                    .fill(sidebarAccentGlow)
+                    .frame(width: 120, height: 120)
+                    .blur(radius: 36)
+                    .offset(x: 28, y: -26)
+            }
     }
 
     @ViewBuilder
     private var panelBackground: some View {
         if presentation == .window {
-            HStack(spacing: 0) {
-                sidebarBackground
-                    .frame(width: sidebarWidth)
-
-                detailBackground
-                    .frame(maxWidth: .infinity)
-            }
+            ExperienceThemeGridTexture()
         } else {
             theme.visual.settingsSurface
         }
@@ -3151,7 +3146,11 @@ private struct SettingsPanelContentView: View {
                 detailBackground
             }
         }
-        .overlay(detailShape.strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1))
+        .overlay {
+            if presentation == .popover {
+                detailShape.strokeBorder(theme.visual.settingsCardBorder, lineWidth: 1)
+            }
+        }
         .shadow(
             color: Color.black.opacity(presentation == .window ? 0 : 0.16),
             radius: 24,

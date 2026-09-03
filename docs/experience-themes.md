@@ -63,6 +63,11 @@ lights, immediate background dragging and content insets. Its backing is
 transparent, so the active theme's sidebar and detail surfaces continue behind
 the traffic lights instead of leaving a fixed-color strip across the top. Theme
 code does not draw replacement traffic lights or intercept window dragging.
+One AppKit backdrop owns the base color across the full window, while the native
+safe area keeps the titlebar as an exclusive top region. Window-mode SwiftUI
+content adds controls and optional Pixel grid texture without repainting the
+translucent base, so the bar and body match without double-compositing. Both
+columns retain explicit spacing below the titlebar.
 
 Inside that shell, each theme owns its sidebar rows and content surfaces:
 
