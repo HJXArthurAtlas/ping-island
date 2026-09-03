@@ -454,6 +454,7 @@ final class DetachedIslandWindowControllerTests: XCTestCase {
         let standardMetrics = DetachedIslandPanelMetrics.petMetrics(scale: 1)
         let enlargedMetrics = DetachedIslandPanelMetrics.petMetrics(scale: 6)
 
+        XCTAssertEqual(standardMetrics.badgeOffset, CGSize(width: 4, height: 2))
         XCTAssertEqual(enlargedMetrics.badgeOffset, standardMetrics.badgeOffset)
         XCTAssertEqual(
             enlargedMetrics.floatingUsageBoltGap,

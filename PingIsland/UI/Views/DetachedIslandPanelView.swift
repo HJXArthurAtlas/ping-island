@@ -21,7 +21,7 @@ struct DetachedIslandPetMetrics: Equatable {
         self.petVisualFrame = 74 * sanitizedScale
         self.petHitFrame = 92 * sanitizedScale
         self.mascotDisplaySize = 46 * sanitizedScale
-        self.badgeOffset = CGSize(width: 8, height: 4)
+        self.badgeOffset = CGSize(width: 4, height: 2)
         self.floatingUsageBoltGap = 9
         self.floatingUsageBoltFontSize = 8 * sanitizedScale
     }
