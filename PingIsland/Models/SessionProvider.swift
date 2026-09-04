@@ -1170,6 +1170,7 @@ struct SessionIntervention: Equatable, Identifiable, Sendable {
                     ?? question["allowsMultiple"] as? Bool
                     ?? question["multiSelect"] as? Bool
                     ?? question["multiple"] as? Bool
+                    ?? question["multi"] as? Bool
                     ?? false,
                 allowsOther: question["isOther"] as? Bool
                     ?? question["allowsOther"] as? Bool

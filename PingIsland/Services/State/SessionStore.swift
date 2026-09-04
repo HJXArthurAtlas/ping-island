@@ -4134,6 +4134,7 @@ actor SessionStore {
                     ?? question["allowsMultiple"] as? Bool
                     ?? question["multiSelect"] as? Bool
                     ?? question["multiple"] as? Bool
+                    ?? question["multi"] as? Bool
                     ?? false,
                 allowsOther: allowsOther || session.clientInfo.supportsCustomAskUserQuestionInput,
                 isSecret: question["isSecret"] as? Bool
