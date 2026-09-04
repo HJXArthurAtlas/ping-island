@@ -3731,31 +3731,36 @@ struct HookInstaller {
           return isObject(answers) && Object.keys(answers).length > 0 ? answers : null;
         }
 
-        async function askLocally(
-          ctx: { ui: { select(title: string, options: string[]): Promise<string | undefined>; input(title: string, placeholder?: string): Promise<string | undefined> } },
-          questions: Record<string, unknown>[],
-        ): Promise<Record<string, string[]> | null> {
-          const answers: Record<string, string[]> = {};
-          for (const [index, question] of questions.entries()) {
-            const prompt = questionPrompt(question, index);
-            const rawOptions = Array.isArray(question?.options) ? question.options : [];
-            const labels = rawOptions.map((option) =>
-              typeof option === "string"
-                ? option
-                : isObject(option) && typeof option.label === "string"
-                  ? option.label
-                  : String(option));
-            const choice = await ctx.ui.select(prompt, [...labels, "Other (type your own)"]);
-            if (typeof choice !== "string" || choice.length === 0) return null;
-            if (choice === "Other (type your own)") {
-              const custom = await ctx.ui.input(prompt);
-              if (typeof custom !== "string" || custom.trim().length === 0) return null;
-              answers[prompt] = [custom.trim()];
-            } else {
-              answers[prompt] = [choice];
-            }
-          }
-          return answers;
+        const ISLAND_ASK_WINDOW_MS = 10000;
+
+        async function askIslandForAnswers(request: {
+          sessionId: string;
+          cwd: string;
+          tty: string | undefined;
+          toolName: string;
+          toolInput: Record<string, unknown>;
+          toolCallId: string;
+        }): Promise<Record<string, unknown> | null> {
+          return new Promise((resolve) => {
+            let settled = false;
+            const finish = (answers: Record<string, unknown> | null) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              resolve(answers);
+            };
+            const timer = setTimeout(() => finish(null), ISLAND_ASK_WINDOW_MS);
+            runBridge(basePayload(request.sessionId, request.cwd, request.tty, {
+              hook_event_name: "PreToolUse",
+              tool_name: request.toolName,
+              tool_input: request.toolInput,
+              tool_use_id: request.toolCallId,
+              _omp_tool_call_id: request.toolCallId,
+            }), true).then(
+              (response) => finish(extractIslandAskAnswers(response)),
+              () => finish(null),
+            );
+          });
         }
 
         export default function pingIslandOmpHook(hook: HookAPI) {
@@ -3790,58 +3795,35 @@ struct HookInstaller {
             const toolName = displayToolName(event.toolName);
             const toolInput = buildToolInput(event);
 
-            // Intercept OMP's built-in ask tool so the question can be answered
-            // in Ping Island as well as in the OMP UI. The Island request is
-            // blocking (the app holds the socket until the question is
-            // answered there); while it is pending we also show OMP's own
-            // selector. Time spent inside OMP-owned dialogs does not count
-            // toward the tool_call handler timeout, and once this handler
-            // returns the leftover dialog is cancelled automatically.
+            // Intercept OMP's built-in ask tool so the question can be
+            // answered in Ping Island. The Island request blocks this handler
+            // for a bounded window; if the question is answered there, the
+            // answers become the tool result. Otherwise we fall through so
+            // OMP's native ask UI takes over, which is also what happens when
+            // the Island socket is unreachable (runBridge resolves null almost
+            // immediately). OMP's runner treats any hook-originated UI call
+            // still pending when this handler returns as a handler error and
+            // discards the result, so we must NOT keep a ctx.ui dialog in
+            // flight while waiting on Island.
             if (event.toolName === "ask" && ctx.hasUI) {
               const questions = askQuestionsFromInput(toolInput);
               if (questions.length > 0) {
-                const islandWinner = runBridge(basePayload(sessionId, getCwd(ctx), tty, {
-                  hook_event_name: "PreToolUse",
-                  tool_name: toolName,
-                  tool_input: toolInput,
-                  _omp_tool_call_id: event.toolCallId,
-                }), true).then((response) => ({
-                  origin: "island",
-                  answers: extractIslandAskAnswers(response),
-                }));
-                const localWinner = askLocally(ctx, questions).then((answers) => ({
-                  origin: "local",
-                  answers,
-                }));
-                let winner = await Promise.race([islandWinner, localWinner]);
-
-                // An Island outage resolves the race with no answers; keep
-                // waiting on the OMP dialog in that case.
-                if (winner.origin === "island" && !winner.answers) {
-                  winner = await localWinner;
-                }
-
-                if (winner.answers && Object.keys(winner.answers).length > 0) {
-                  if (winner.origin === "local") {
-                    // Mirror the answers to Island so its pending question resolves.
-                    void runBridge(basePayload(sessionId, getCwd(ctx), tty, {
-                      hook_event_name: "PreToolUse",
-                      tool_name: toolName,
-                      tool_input: { ...toolInput, answers: winner.answers },
-                      _omp_tool_call_id: event.toolCallId,
-                    }), false);
-                  }
-                  const reason = formatAskAnswersForModel(questions, winner.answers);
+                const islandAnswers = await askIslandForAnswers({
+                  sessionId,
+                  cwd: getCwd(ctx),
+                  tty,
+                  toolName,
+                  toolInput,
+                  toolCallId: event.toolCallId,
+                });
+                if (islandAnswers && Object.keys(islandAnswers).length > 0) {
+                  const reason = formatAskAnswersForModel(questions, islandAnswers);
                   if (reason) {
                     return { block: true, reason };
                   }
                 }
-
-                // Local dialog cancelled (or no usable answer anywhere): match
-                // OMP's native cancel semantics instead of double-prompting.
-                if (winner.origin === "local") {
-                  return { block: true, reason: "User cancelled the question." };
-                }
+                // No Island answer (unreachable / window elapsed / cancelled):
+                // fall through to the normal path so OMP's native ask UI runs.
               }
             }
 
@@ -3852,6 +3834,7 @@ struct HookInstaller {
                   hook_event_name: "PermissionRequest",
                   tool_name: toolName,
                   tool_input: toolInput,
+                  tool_use_id: event.toolCallId,
                   _omp_tool_call_id: event.toolCallId,
                 }), true);
                 if (deniedByIsland(response)) {
@@ -3866,6 +3849,7 @@ struct HookInstaller {
               hook_event_name: "PreToolUse",
               tool_name: toolName,
               tool_input: toolInput,
+              tool_use_id: event.toolCallId,
               _omp_tool_call_id: event.toolCallId,
             }), false);
             return undefined;
@@ -3879,6 +3863,7 @@ struct HookInstaller {
               tool_name: displayToolName(event.toolName),
               tool_input: event.input,
               is_error: event.isError,
+              tool_use_id: event.toolCallId,
               _omp_tool_call_id: event.toolCallId,
             }), false);
           });
