@@ -3651,6 +3651,113 @@ struct HookInstaller {
           return behavior === "deny" || permissionDecision === "deny";
         }
 
+        function askQuestionsFromInput(toolInput: Record<string, unknown>): Record<string, unknown>[] {
+          if (!isObject(toolInput) || !Array.isArray(toolInput.questions)) return [];
+          return toolInput.questions.filter(isObject);
+        }
+
+        function questionPrompt(question: Record<string, unknown>, index: number): string {
+          if (typeof question?.question === "string" && question.question) return question.question;
+          if (typeof question?.prompt === "string" && question.prompt) return question.prompt;
+          if (typeof question?.label === "string" && question.label) return question.label;
+          return `Question ${index + 1}`;
+        }
+
+        // Island answers are keyed by question text/id/index depending on the
+        // client's encoding strategy; resolve every key back to the question
+        // prompt so the model sees stable "question: answer" pairs.
+        function questionAnswerEntries(
+          questions: Record<string, unknown>[],
+          answers: Record<string, unknown>,
+        ): [string, string[]][] {
+          const promptByKey = new Map<string, string>();
+          questions.forEach((question, index) => {
+            const prompt = questionPrompt(question, index);
+            for (const key of [
+              question?.id,
+              question?.question,
+              question?.prompt,
+              `q_${index}`,
+              String(index),
+            ]) {
+              if (typeof key === "string" && key.length > 0 && !promptByKey.has(key)) {
+                promptByKey.set(key, prompt);
+              }
+            }
+          });
+
+          const valuesByPrompt = new Map<string, string[]>();
+          for (const [key, rawValue] of Object.entries(answers)) {
+            const prompt = promptByKey.get(key) ?? key;
+            const values = Array.isArray(rawValue)
+              ? rawValue.filter((value): value is string => typeof value === "string")
+              : typeof rawValue === "string"
+                ? [rawValue]
+                : [];
+            if (values.length === 0) continue;
+            valuesByPrompt.set(prompt, [...(valuesByPrompt.get(prompt) ?? []), ...values]);
+          }
+
+          return [...valuesByPrompt.entries()];
+        }
+
+        // Mimic OMP's native ask tool result so the model sees the same shape
+        // no matter which surface (OMP dialog or Ping Island) answered.
+        function formatAskAnswersForModel(
+          questions: Record<string, unknown>[],
+          answers: Record<string, unknown>,
+        ): string {
+          const entries = questionAnswerEntries(questions, answers);
+          if (entries.length === 0) return "";
+          if (entries.length === 1 && questions.length <= 1) {
+            return `User selected: ${entries[0][1].join(", ")}`;
+          }
+          return ["User answers:", ...entries.map(([prompt, values]) => `${prompt}: ${values.join(", ")}`)].join("\\n");
+        }
+
+        function extractIslandAskAnswers(response: Record<string, unknown> | null): Record<string, unknown> | null {
+          const hookSpecificOutput = isObject(response?.hookSpecificOutput)
+            ? response.hookSpecificOutput
+            : undefined;
+          const decisionUpdatedInput = isObject(hookSpecificOutput?.decision)
+            && isObject(hookSpecificOutput.decision.updatedInput)
+            ? hookSpecificOutput.decision.updatedInput
+            : undefined;
+          const answers = isObject(decisionUpdatedInput?.answers)
+            ? decisionUpdatedInput.answers
+            : isObject(hookSpecificOutput?.updatedInput)
+              ? hookSpecificOutput.updatedInput.answers
+              : undefined;
+          return isObject(answers) && Object.keys(answers).length > 0 ? answers : null;
+        }
+
+        async function askLocally(
+          ctx: { ui: { select(title: string, options: string[]): Promise<string | undefined>; input(title: string, placeholder?: string): Promise<string | undefined> } },
+          questions: Record<string, unknown>[],
+        ): Promise<Record<string, string[]> | null> {
+          const answers: Record<string, string[]> = {};
+          for (const [index, question] of questions.entries()) {
+            const prompt = questionPrompt(question, index);
+            const rawOptions = Array.isArray(question?.options) ? question.options : [];
+            const labels = rawOptions.map((option) =>
+              typeof option === "string"
+                ? option
+                : isObject(option) && typeof option.label === "string"
+                  ? option.label
+                  : String(option));
+            const choice = await ctx.ui.select(prompt, [...labels, "Other (type your own)"]);
+            if (typeof choice !== "string" || choice.length === 0) return null;
+            if (choice === "Other (type your own)") {
+              const custom = await ctx.ui.input(prompt);
+              if (typeof custom !== "string" || custom.trim().length === 0) return null;
+              answers[prompt] = [custom.trim()];
+            } else {
+              answers[prompt] = [choice];
+            }
+          }
+          return answers;
+        }
+
         export default function pingIslandOmpHook(hook: HookAPI) {
           const tty = detectTTY();
           const pendingPermissionSessions = new Set<string>();
@@ -3683,6 +3790,61 @@ struct HookInstaller {
             const toolName = displayToolName(event.toolName);
             const toolInput = buildToolInput(event);
 
+            // Intercept OMP's built-in ask tool so the question can be answered
+            // in Ping Island as well as in the OMP UI. The Island request is
+            // blocking (the app holds the socket until the question is
+            // answered there); while it is pending we also show OMP's own
+            // selector. Time spent inside OMP-owned dialogs does not count
+            // toward the tool_call handler timeout, and once this handler
+            // returns the leftover dialog is cancelled automatically.
+            if (event.toolName === "ask" && ctx.hasUI) {
+              const questions = askQuestionsFromInput(toolInput);
+              if (questions.length > 0) {
+                const islandWinner = runBridge(basePayload(sessionId, getCwd(ctx), tty, {
+                  hook_event_name: "PreToolUse",
+                  tool_name: toolName,
+                  tool_input: toolInput,
+                  _omp_tool_call_id: event.toolCallId,
+                }), true).then((response) => ({
+                  origin: "island",
+                  answers: extractIslandAskAnswers(response),
+                }));
+                const localWinner = askLocally(ctx, questions).then((answers) => ({
+                  origin: "local",
+                  answers,
+                }));
+                let winner = await Promise.race([islandWinner, localWinner]);
+
+                // An Island outage resolves the race with no answers; keep
+                // waiting on the OMP dialog in that case.
+                if (winner.origin === "island" && !winner.answers) {
+                  winner = await localWinner;
+                }
+
+                if (winner.answers && Object.keys(winner.answers).length > 0) {
+                  if (winner.origin === "local") {
+                    // Mirror the answers to Island so its pending question resolves.
+                    void runBridge(basePayload(sessionId, getCwd(ctx), tty, {
+                      hook_event_name: "PreToolUse",
+                      tool_name: toolName,
+                      tool_input: { ...toolInput, answers: winner.answers },
+                      _omp_tool_call_id: event.toolCallId,
+                    }), false);
+                  }
+                  const reason = formatAskAnswersForModel(questions, winner.answers);
+                  if (reason) {
+                    return { block: true, reason };
+                  }
+                }
+
+                // Local dialog cancelled (or no usable answer anywhere): match
+                // OMP's native cancel semantics instead of double-prompting.
+                if (winner.origin === "local") {
+                  return { block: true, reason: "User cancelled the question." };
+                }
+              }
+            }
+
             if (isDangerousBash(event)) {
               pendingPermissionSessions.add(bridgedSessionId);
               try {
@@ -3706,7 +3868,7 @@ struct HookInstaller {
               tool_input: toolInput,
               _omp_tool_call_id: event.toolCallId,
             }), false);
-            return { permissionDecision: "allow" };
+            return undefined;
           });
 
           hook.on("tool_result", async (event, ctx) => {
