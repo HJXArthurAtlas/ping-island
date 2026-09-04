@@ -472,7 +472,10 @@ func remoteAgentForwardsCodexUsageSnapshots() async throws {
             matching: { $0.type == "codex_usage" }
         )
 
-        #expect(message.payload.sourceFilePath == rolloutURL.path())
+        let resolvedSourcePath = URL(fileURLWithPath: message.payload.sourceFilePath)
+            .resolvingSymlinksInPath()
+            .path()
+        #expect(resolvedSourcePath == rolloutURL.resolvingSymlinksInPath().path())
         #expect(message.payload.planType == "pro")
         #expect(message.payload.limitID == "codex")
         #expect(message.payload.tokenUsage?.totalTokens == 1_545)

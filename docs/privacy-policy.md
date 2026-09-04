@@ -37,8 +37,8 @@ such as:
 - Project, terminal, tmux, IDE, SSH, and session identifiers used to show the
   right session and jump back to the right workspace.
 - Configuration files for supported local tools, including Claude Code, Codex,
-  Gemini CLI, Qwen Code, Hermes Agent, OpenClaw, OpenCode, Cursor, Qoder,
-  CodeBuddy, WorkBuddy, GitHub Copilot, and compatible hook-driven tools.
+  Gemini CLI, Qwen Code, Hermes Agent, OpenClaw, OpenCode, Cursor, Qoder IDE,
+  Qoder CN IDE, CodeBuddy, WorkBuddy, GitHub Copilot, and compatible hook-driven tools.
 - User preferences such as display mode, sounds, shortcuts, mascot settings,
   and integration settings.
 

@@ -13,7 +13,7 @@
 "系统与基础行为" = "System behavior";
 "显示器与位置" = "Displays and placement";
 "客户端宠物与动作" = "Client mascots and motion";
-"通知与提示音" = "Notifications and sounds";
+"主题与提示音" = "Themes and sounds";
 "Hooks 与 IDE 扩展" = "Hooks and IDE extensions";
 "版本与更新" = "Version and updates";
 
@@ -653,7 +653,7 @@
 "马上就好" = "Almost there";
 "设置展示模式示意图，以及没有活跃或待处理会话时刘海/悬浮宠物使用的默认形象。" = "Choose the mascot shown in presentation previews and used by the notch or floating pet when no session is active or needs attention.";
 "宠物大小" = "Mascot size";
-"自动模式会根据当前显示器分辨率调整；也可以固定为标准、较大或超大尺寸。" = "Automatic mode adjusts to the current display resolution. You can also choose a fixed standard, larger, or extra-large size.";
+"按倍率调整独立悬浮宠物尺寸，最大可放大至 10 倍。" = "Scale the floating mascot to a custom size, up to 10x.";
 "空闲时自动保留到终端" = "Keep in terminal automatically when idle";
 "键盘和鼠标静默达到设定时长后临时开启上方策略；恢复活跃后回到手动设置。" = "Temporarily enable the policy above after keyboard and mouse inactivity reaches the selected duration. Manual settings resume when activity returns.";
 "静默时长" = "Idle duration";
@@ -782,3 +782,19 @@
 "管理 ~/.qoder-cn/settings.json，按 Claude Code hooks 协议接入 qoderclicn" = "Manage ~/.qoder-cn/settings.json using the Claude Code hooks protocol for qoderclicn";
 "管理 ~/.kimi-code/config.toml，按 Kimi CLI 官方 hooks 协议接入 Island" = "Manage ~/.kimi-code/config.toml using Kimi CLI's official hooks protocol for Island";
 "这会重新写入 %@ 的 Island hooks TOML 配置，并保留其他非 Island 设置。" = "This rewrites %@'s Island hooks TOML configuration while preserving other non-Island settings.";
+
+// Experience themes
+"体验主题" = "Experience theme";
+"主题同时定义界面细节、确认操作反馈和推荐的提示音方案。导入主题音效包时，视觉主题会保持不变。" = "A theme coordinates interface details, confirmation feedback, and recommended sounds. Importing a sound pack does not change the visual theme.";
+"选择主题会同步其推荐声音方案；之后仍可在下方改为系统音或 CESP 主题包。" = "Selecting a theme applies its recommended sound profile. You can still choose system sounds or a CESP pack below.";
+"PingIsland 原生" = "PingIsland native";
+"延续 PingIsland 的深色玻璃界面与原有 8-bit 声音语言。" = "Ping Island's dark glass interface with its original 8-bit sound language.";
+"macOS" = "macOS";
+"系统材质、原生侧栏和 SF Symbols 组成的 macOS 风格。" = "A macOS experience built from system materials, a native sidebar, and SF Symbols.";
+"Pixel" = "Pixel";
+"像素字形、游戏机图标和 AgentIsland 8-bit 音效。" = "Pixel type, game-console icons, and AgentIsland's 8-bit sounds.";
+"Pixel 配色" = "Pixel palette";
+"Arcade Neon" = "Arcade Neon";
+"街机厅深色底与高对比霓虹色。" = "Deep arcade tones with high-contrast neon accents.";
+"Game Boy Olive" = "Game Boy Olive";
+"经典掌机的四阶橄榄绿色调。" = "The classic four-step olive handheld palette.";
