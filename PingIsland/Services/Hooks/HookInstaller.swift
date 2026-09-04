@@ -3731,8 +3731,11 @@ struct HookInstaller {
           return isObject(answers) && Object.keys(answers).length > 0 ? answers : null;
         }
 
-        const ISLAND_ASK_WINDOW_MS = 10000;
-
+        // Wait unbounded, matching OMP's native ask dialog default
+        // (ask.timeout = 0 waits indefinitely). The bridge process only
+        // settles when Island answers or closes the socket (superseded
+        // question, session end, app quit); in every close case the handler
+        // falls through to OMP's native ask UI.
         async function askIslandForAnswers(request: {
           sessionId: string;
           cwd: string;
@@ -3746,10 +3749,8 @@ struct HookInstaller {
             const finish = (answers: Record<string, unknown> | null) => {
               if (settled) return;
               settled = true;
-              clearTimeout(timer);
               resolve(answers);
             };
-            const timer = setTimeout(() => finish(null), ISLAND_ASK_WINDOW_MS);
             runBridge(basePayload(request.sessionId, request.cwd, request.tty, {
               hook_event_name: "PreToolUse",
               tool_name: request.toolName,
@@ -3797,14 +3798,16 @@ struct HookInstaller {
 
             // Intercept OMP's built-in ask tool so the question can be
             // answered in Ping Island. The Island request blocks this handler
-            // for a bounded window; if the question is answered there, the
-            // answers become the tool result. Otherwise we fall through so
-            // OMP's native ask UI takes over, which is also what happens when
-            // the Island socket is unreachable (runBridge resolves null almost
-            // immediately). OMP's runner treats any hook-originated UI call
-            // still pending when this handler returns as a handler error and
-            // discards the result, so we must NOT keep a ctx.ui dialog in
-            // flight while waiting on Island.
+            // unbounded (matching OMP's native ask dialog default of waiting
+            // indefinitely); if the question is answered there, the answers
+            // become the tool result. We only fall through to OMP's native ask
+            // UI when the bridge cannot reach Island at all (runBridge resolves
+            // null almost immediately on spawn/connect failure) or Island
+            // closed the socket without an answer (superseded question,
+            // session end, app quit). OMP's runner treats any hook-originated
+            // UI call still pending when this handler returns as a handler
+            // error and discards the result, so we must NOT keep a ctx.ui
+            // dialog in flight while waiting on Island.
             if (event.toolName === "ask" && ctx.hasUI) {
               const questions = askQuestionsFromInput(toolInput);
               if (questions.length > 0) {
